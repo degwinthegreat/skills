@@ -12,10 +12,10 @@ create-intent-skill と improve-intent-skill は、2つ一緒に入れます。i
 
 ```
 /plugin marketplace add degwinthegreat/skills
-/plugin install intent-skills@degwinthegreat-skills
+/plugin install kstack@degwinthegreat-skills
 ```
 
-1つの plugin（`intent-skills`）に2つのスキルが入っています。plugin のスキルには plugin の名前が付くので、`/intent-skills:create-intent-skill` と `/intent-skills:improve-intent-skill` で呼びます。
+1つの plugin（`kstack`）に2つのスキルが入っています。plugin のスキルには plugin の名前が付くので、`/kstack:create-intent-skill` と `/kstack:improve-intent-skill` で呼びます。
 
 ### npx skills
 

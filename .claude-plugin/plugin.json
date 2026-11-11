@@ -1,5 +1,5 @@
 {
-  "name": "intent-skills",
+  "name": "kstack",
   "description": "create-intent-skill と improve-intent-skill。意思（解決したいこと）に沿ってスキルを作り、使って起きた失敗の記録から直す",
   "author": {
     "name": "degwinthegreat"
