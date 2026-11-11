@@ -1,0 +1,14 @@
+{
+  "name": "degwinthegreat-skills",
+  "description": "degwinthegreat のスキル",
+  "owner": {
+    "name": "degwinthegreat"
+  },
+  "plugins": [
+    {
+      "name": "intent-skills",
+      "source": "./",
+      "description": "create-intent-skill と improve-intent-skill を一緒に入れる。improve-intent-skill は create-intent-skill の手順を読むので、分けずに1つにしている"
+    }
+  ]
+}
