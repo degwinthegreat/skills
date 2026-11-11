@@ -4,6 +4,42 @@ Agent skills for Claude Code, starting with create-intent-skill: decide what you
 
 Claude Code などのエージェントで使うスキルを置くリポジトリです。
 
+## インストール
+
+create-intent-skill と improve-intent-skill は、2つ一緒に入れます。improve-intent-skill は、隣にある create-intent-skill の手順を読むからです。
+
+### Claude Code の plugin（推奨）
+
+```
+/plugin marketplace add degwinthegreat/skills
+/plugin install intent-skills@degwinthegreat-skills
+```
+
+1つの plugin（`intent-skills`）に2つのスキルが入っています。plugin のスキルには plugin の名前が付くので、`/intent-skills:create-intent-skill` と `/intent-skills:improve-intent-skill` で呼びます。
+
+### npx skills
+
+```sh
+npx skills add degwinthegreat/skills --skill create-intent-skill --skill improve-intent-skill
+```
+
+npx で入れるときは、2つとも入れてください。片方だけだと improve-intent-skill が動きません。こちらは `/create-intent-skill` と `/improve-intent-skill` で呼びます。
+
+### 手で置く
+
+`~/.claude/skills/` に、2つのフォルダを並べてリンクかコピーで置きます。
+
+```sh
+git clone https://github.com/degwinthegreat/skills.git
+# リンク（pull すると更新される）
+ln -s "$(pwd)/skills/create-intent-skill" ~/.claude/skills/create-intent-skill
+ln -s "$(pwd)/skills/improve-intent-skill" ~/.claude/skills/improve-intent-skill
+# またはコピー
+cp -R skills/create-intent-skill skills/improve-intent-skill ~/.claude/skills/
+```
+
+plugin と手で置いたものの両方があると、両方が読み込まれます。どちらか1つにしてください。
+
 ## create-intent-skill
 
 ほかの人のスキルをいくつも参考にしてスキルを書くと、ルールが混ざって筋がぶれます。create-intent-skill では、先に「何を解決したいか」を方針として下書きして人が確かめ、参照先のルールはその方針に役立つものだけを採ります。出力は、プロジェクト用の `SKILL.md` と、方針の `policy.md`、ルールごとの採否と出典を残す `decisions.md` の3つです。
@@ -18,21 +54,11 @@ v0 の試作です。3つのスキルを作って1回見直しました（[decis
 
 ### 入れ方
 
-`~/.claude/skills/` に、リンクかコピーで置きます。
-
-```sh
-git clone https://github.com/degwinthegreat/skills.git
-# リンク（pull すると更新される）
-ln -s "$(pwd)/skills/create-intent-skill" ~/.claude/skills/create-intent-skill
-# またはコピー
-cp -R skills/create-intent-skill ~/.claude/skills/
-```
-
-人が名前で呼ぶスキルです（`disable-model-invocation: true`）。Claude Code では `/create-intent-skill` で呼びます。
+[インストール](#インストール)を見てください。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。
 
 ### local.md（任意）
 
-手元にだけある道具（プロジェクトの知識をまとめたもの、作業の記録を測るツールなど）の使い方は、`create-intent-skill/local.md` に各自で書けます。スキルは、このファイルがあれば読み、無ければその部分を飛ばします。このリポジトリには入れていません（`.gitignore` で除いています）。
+手元にだけある道具（プロジェクトの知識をまとめたもの、作業の記録を測るツールなど）の使い方は、`create-intent-skill/local.md` に各自で書けます。スキルは、このファイルがあれば読み、無ければその部分を飛ばします。このリポジトリには入れていません（`.gitignore` で除いています）。plugin で入れたときは、スキルのフォルダが plugin の cache にあり、更新で入れ替わります。`local.md` を使うなら、「手で置く」のリンクで入れると、clone した側に置けます。
 
 ## improve-intent-skill
 
@@ -42,7 +68,7 @@ cp -R skills/create-intent-skill ~/.claude/skills/
 - [policy.md](improve-intent-skill/policy.md)：このスキル自身の方針
 - [decisions.md](improve-intent-skill/decisions.md)：このスキル自身のルールの採否と出典
 
-v0 の試作で、まだ使っていません。create-intent-skill の手順1を相対パスで読むので、2つのスキルを同じフォルダに並べて入れてください。入れ方と `local.md` の扱いは、create-intent-skill と同じです。Claude Code では `/improve-intent-skill` で呼びます。
+v0 の試作で、まだ使っていません。create-intent-skill の手順1を相対パスで読むので、2つのスキルを同じフォルダに並べて入れます（[インストール](#インストール)）。`local.md` の扱いは、create-intent-skill と同じです。
 
 ## agent-taxonomy との関係
 
