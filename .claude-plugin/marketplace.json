@@ -1,0 +1,14 @@
+{
+  "name": "kstack",
+  "description": "degwinthegreat のスキル",
+  "owner": {
+    "name": "degwinthegreat"
+  },
+  "plugins": [
+    {
+      "name": "kstack",
+      "source": "./",
+      "description": "このリポジトリのスキルを1つにまとめた plugin。スキルが隣のスキルの手順を読むことがあるので、スキルを分けずに、足すときもこの plugin に入れる"
+    }
+  ]
+}

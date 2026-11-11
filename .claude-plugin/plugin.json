@@ -1,0 +1,10 @@
+{
+  "name": "kstack",
+  "description": "create-intent-skill と improve-intent-skill。意思（解決したいこと）に沿ってスキルを作り、使って起きた失敗の記録から直す",
+  "author": {
+    "name": "degwinthegreat"
+  },
+  "repository": "https://github.com/degwinthegreat/skills",
+  "license": "MIT",
+  "skills": ["./create-intent-skill", "./improve-intent-skill"]
+}
