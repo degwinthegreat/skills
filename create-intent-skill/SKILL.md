@@ -32,6 +32,8 @@ disable-model-invocation: true
 
 ## 2. 参照先を3〜5件に絞る
 
+agent-taxonomy のサイトが使えないときは、使う人に参照先を3〜5件挙げてもらい、この節の3（上流の原文を読む）から始める。選ばなかった近いエントリは書かなくてよい。ほかの手順はそのまま使う。
+
 1. [llms.txt](https://agent-taxonomy.kawaida-dev.com/llms.txt) の Bottlenecks か Jobs から、JOB の `.md` を開く。比較の表で候補を選び、エントリの `.md` を読む。
 2. 解決したいことに直接役立つルールを持つものを選ぶ。似たものは1件にまとめる。
 3. 上流の原文を読む。エントリの `.md` の source は既定のブランチを指すので、読む前にその時点の commit の SHA を取得し（例：`gh api repos/<owner>/<repo>/commits/<ブランチ> --jq .sha`）、SHA を固定した URL で読む。
