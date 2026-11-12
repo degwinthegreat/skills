@@ -1,10 +1,14 @@
 {
   "name": "kstack",
-  "description": "create-intent-skill と improve-intent-skill。意思（解決したいこと）に沿ってスキルを作り、使って起きた失敗の記録から直す",
+  "description": "create-intent-skill、improve-intent-skill、cognitive-surrender。意思（解決したいこと）に沿ってスキルを作り、使って起きた失敗の記録から直し、人が明け渡していた所を見つける",
   "author": {
     "name": "degwinthegreat"
   },
   "repository": "https://github.com/degwinthegreat/skills",
   "license": "MIT",
-  "skills": ["./create-intent-skill", "./improve-intent-skill"]
+  "skills": [
+    "./create-intent-skill",
+    "./improve-intent-skill",
+    "./cognitive-surrender"
+  ]
 }
