@@ -113,4 +113,11 @@ PR #10 の確認で、持ち主が、PR を作るスキルの description を、
 | 手順3 | 0回。前の手順3は、参考にしたい運用があれば上流で読む、だけだった。参考をどこから探すかが無かった | create-intent-skill の手順2と同じく、llms.txt の Bottlenecks か Jobs から同じ分野の JOB を開き、比較の表で3〜5件を選ぶ形にした。見るのは、ほかの作者のスキルの分け方と description の書き方。description の書き方そのものの参照（skill-creator など）も候補にする。上流は SHA を固定して読む | P3、S2。読み方は create-intent-skill の手順2の3を指す（写さない）。持ち主が決めた |
 | 手順7の渡し先と、improve-intent-skill の入口 | 0回。上の入口の変更で、改善の入口は分担が論点の相談を止める。手順7で improve-intent-skill に渡す変更（たとえば description の書き換え）も、そのままでは入口と、2回の失敗を待つ縛り（improve-intent-skill の P2）で止まる | 手順7で、improve-intent-skill には設計書のパスと、決めたこと（人が OK したもの）を添えて渡す、とした。improve-intent-skill の入口に、設計書から渡された変更は通す、手順2では人が1回で直すと決めたものとして扱う、の段落を足した | P7 の2文目（下書き、持ち主の確認待ち）。improve-intent-skill の P7（人が決めたときは1回でも直してよい）に当てた |
 
-本文の読み手のテストの結果：（下に書く）
+本文の読み手のテストの結果（2026-11-13）：直した2つの SKILL.md（improve-intent-skill と redesign-intent-workflow）だけを、流れを知らない別のエージェントに読ませた。場面は持ち主の例で、PR を作るスキルの description を、文章を書くスキルやほかの PR のスキルとの関係を見て直したい、失敗の記録は無い、という相談。次は意図どおりに答えた。
+
+- improve-intent-skill は入口で止まり、redesign-intent-workflow を示す。redesign-intent-workflow は入口を通って手順1に進む。
+- 手順1で、スキルの関係の表を5つの列で作る。`.claude/skills/`・plugin・`~/.claude/skills/` を、PR や writing の語で検索して拾う。手元にだけあるスキルを区別する。
+- 手順3で、llms.txt から PR authoring などの JOB を開き、3〜5件を選んで、分け方と description の書き方を見る。skill-creator も候補にし、SHA を固定して読む。
+- 手順7で、description の書き換えを、設計書のパスと人が OK した決めたことを添えて improve-intent-skill に渡す。
+
+迷った所として挙がったもののうち、2つを improve-intent-skill の入口の1文で直した。1つは、渡された変更をどう確かめるか（設計書のパスと、人が OK した決めたことが添えられていれば通す）。もう1つは、推奨のまま決めたものも含むか（含めない）。残りは直していない。重なりの判定の基準と、`disable-model-invocation` のスキルの書き方は、表を作る場で決まる。手順3が web を要ることは、手順3の終わりの段落（サイトが使えないとき）で足りる。
