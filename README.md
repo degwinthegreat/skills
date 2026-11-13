@@ -49,6 +49,7 @@ plugin と手で置いたものの両方があると、両方が読み込まれ�
 - [SKILL.md](create-intent-skill/SKILL.md)：手順
 - [policy.md](create-intent-skill/policy.md)：このスキル自身の方針
 - [decisions.md](create-intent-skill/decisions.md)：このスキル自身のルールの採否と出典、見直しの記録
+- [shared-policy.md](create-intent-skill/shared-policy.md)：このリポジトリのスキルに共通する方針。各スキルの policy.md から指す。npx skills でスキルを1つずつ入れたときにも届くよう、create-intent-skill のフォルダに置いている
 
 ### 状態
 

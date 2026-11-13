@@ -82,3 +82,7 @@ cognitive-surrender（人が出力を明け渡していた所を見つけるス�
 - 見つけたものをこのスキルで直さない。
 - 数を推測で埋めない。
 - 参照先の文を写さない。
+
+## 共有の方針
+
+このリポジトリのスキルに共通する方針は、[shared-policy.md](https://github.com/degwinthegreat/skills/blob/main/create-intent-skill/shared-policy.md) にある（S1〜S3）。この方針の上に置き、譲る順の対象にしない。cognitive-surrender は1つだけでも入れられるので、相対パスではなく GitHub の URL で指す。S1 は、譲る順の下の「数を推測で埋めない」を、理由にも広げたもの。

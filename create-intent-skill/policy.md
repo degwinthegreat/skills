@@ -53,3 +53,7 @@ agent-taxonomy の参照先をいくつも並べてスキルを書くと、ル�
 - **The context window is a budget**（context-budget）：P2 の「最小限の指示」。常に読み込まれる description を短くし、手で呼ぶスキルにする判断に使う。
 - P3 の「要求そのものを疑う」に当たる群は無い。近いのは pstack の attack-the-premise（/principles では借用として扱い、群には数えていない）。ただし、attack-the-premise が疑うのは、失敗した修正どうしに共通する前提で、要求そのものではない。
 - P4 に当たる群は無い。根拠は decisions.md の PS1。
+
+## 共有の方針
+
+このリポジトリのスキルに共通する方針は、[shared-policy.md](shared-policy.md) にある（S1〜S3）。この方針の上に置き、譲る順の対象にしない。S1 は、譲る順の下の「推測で値を埋めない」を、理由にも広げたもの。S2 は、SKILL.md の手順2の3（SHA を固定して上流を読む）と同じ向き。
