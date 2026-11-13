@@ -6,7 +6,7 @@ Claude Code などのエージェントで使うスキルを置くリポジト�
 
 ## インストール
 
-create-intent-skill と improve-intent-skill は、2つ一緒に入れます。improve-intent-skill は、隣にある create-intent-skill の手順を読むからです。cognitive-surrender は、1つだけでも動きます。
+create-intent-skill、improve-intent-skill、redesign-intent-workflow は、3つ一緒に入れます。improve-intent-skill と redesign-intent-workflow は、隣にある create-intent-skill の手順と共有の方針を読み、互いを行き先として指すからです。cognitive-surrender は、1つだけでも動きます。
 
 ### Claude Code の plugin（推奨）
 
@@ -15,16 +15,16 @@ create-intent-skill と improve-intent-skill は、2つ一緒に入れます。i
 /plugin install kstack@kstack
 ```
 
-1つの plugin（`kstack`）に3つのスキルが入っています。plugin のスキルには plugin の名前が付くので、`/kstack:create-intent-skill`、`/kstack:improve-intent-skill`、`/kstack:cognitive-surrender` で呼びます。
+1つの plugin（`kstack`）に4つのスキルが入っています。plugin のスキルには plugin の名前が付くので、`/kstack:create-intent-skill`、`/kstack:improve-intent-skill`、`/kstack:redesign-intent-workflow`、`/kstack:cognitive-surrender` で呼びます。
 
 ### npx skills
 
 ```sh
-npx skills add degwinthegreat/skills --skill create-intent-skill --skill improve-intent-skill
+npx skills add degwinthegreat/skills --skill create-intent-skill --skill improve-intent-skill --skill redesign-intent-workflow
 npx skills add degwinthegreat/skills --skill cognitive-surrender
 ```
 
-npx で入れるときは、create-intent-skill と improve-intent-skill を2つとも入れてください。片方だけだと improve-intent-skill が動きません。cognitive-surrender は、使うときだけ入れます。こちらは `/create-intent-skill`、`/improve-intent-skill`、`/cognitive-surrender` で呼びます。
+npx で入れるときは、create-intent-skill、improve-intent-skill、redesign-intent-workflow を3つとも入れてください。create-intent-skill が無いと、ほかの2つが動きません。cognitive-surrender は、使うときだけ入れます。こちらは `/create-intent-skill`、`/improve-intent-skill`、`/redesign-intent-workflow`、`/cognitive-surrender` で呼びます。
 
 ### 手で置く
 
@@ -35,9 +35,10 @@ git clone https://github.com/degwinthegreat/skills.git
 # リンク（pull すると更新される）
 ln -s "$(pwd)/skills/create-intent-skill" ~/.claude/skills/create-intent-skill
 ln -s "$(pwd)/skills/improve-intent-skill" ~/.claude/skills/improve-intent-skill
+ln -s "$(pwd)/skills/redesign-intent-workflow" ~/.claude/skills/redesign-intent-workflow
 ln -s "$(pwd)/skills/cognitive-surrender" ~/.claude/skills/cognitive-surrender
 # またはコピー
-cp -R skills/create-intent-skill skills/improve-intent-skill skills/cognitive-surrender ~/.claude/skills/
+cp -R skills/create-intent-skill skills/improve-intent-skill skills/redesign-intent-workflow skills/cognitive-surrender ~/.claude/skills/
 ```
 
 plugin と手で置いたものの両方があると、両方が読み込まれます。どちらか1つにしてください。
@@ -53,7 +54,7 @@ plugin と手で置いたものの両方があると、両方が読み込まれ�
 
 ### 状態
 
-v0 の試作です。3つのスキルを作って1回見直しました（[decisions.md](create-intent-skill/decisions.md) の「5. v0 の見直し」）。手順やファイルの形は、使いながら変わります。
+v0 の試作です。最初に3つのスキルを作って1回見直しました（[decisions.md](create-intent-skill/decisions.md) の「5. v0 の見直し」）。手順やファイルの形は、使いながら変わります。
 
 ### 入れ方
 
@@ -71,7 +72,17 @@ v0 の試作です。3つのスキルを作って1回見直しました（[decis
 - [policy.md](improve-intent-skill/policy.md)：このスキル自身の方針
 - [decisions.md](improve-intent-skill/decisions.md)：このスキル自身のルールの採否と出典
 
-v0 の試作で、まだ使っていません。create-intent-skill の手順1を相対パスで読むので、2つのスキルを同じフォルダに並べて入れます（[インストール](#インストール)）。`local.md` の扱いは、create-intent-skill と同じです。
+v0 の試作で、まだ使っていません。数えられる失敗が無い相談や、複数のスキルにまたがる組み立てを変える相談では、入口で止まり、redesign-intent-workflow を指します。create-intent-skill の手順1を相対パスで読むので、3つのスキルを同じフォルダに並べて入れます（[インストール](#インストール)）。`local.md` の扱いは、create-intent-skill と同じです。
+
+## redesign-intent-workflow
+
+いくつものスキルが読む置き場（決定の記録、守る制約の一覧など）の組み立てに違和感があるとき、それは数えられる失敗として残りません。1つのスキルを最小の変更で直しても消えません。redesign-intent-workflow は、複数のスキルにまたがる組み立て（置き場・読み手・信頼の順・スキルの分担）を設計し直すスキルです。直すのが1つのスキルでも、論点が隣のスキルとの分担（いつ呼ばれるか＝description、何を持つか、どこで渡すか）なら、このスキルで受けます。たとえば、PR を作るスキルの description を、文章を書くスキルとの関係を見て直す相談です。今の形と、スキルどうしの関係を棚卸しし、agent-taxonomy で同じ分野のスキルの分け方と description の書き方を比べ、困りごとを読み手ごとに分け、案を並べて、決めたいことを推奨付きで聞きます。そのうえでチーム向けの設計書を書き、移行を create-intent-skill か improve-intent-skill に渡せる大きさの PR に分けます。スキルの本文は、このスキルでは直しません。improve-intent-skill は、こうした相談が来ると入口で止まり、このスキルを指します。
+
+- [SKILL.md](redesign-intent-workflow/SKILL.md)：手順
+- [policy.md](redesign-intent-workflow/policy.md)：このスキル自身の方針
+- [decisions.md](redesign-intent-workflow/decisions.md)：このスキル自身のルールの採否と出典
+
+v0 の試作で、まだ使っていません。create-intent-skill の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。create-intent-skill と improve-intent-skill を相対パスで読むので、3つを同じフォルダに並べて入れます（[インストール](#インストール)）。
 
 ## cognitive-surrender
 
