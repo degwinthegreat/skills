@@ -124,3 +124,4 @@ improve-intent-skill の手順で直した。材料は、持ち主のフィー�
 | 変えたところ | 起きたこと | 直したこと | 理由 |
 | --- | --- | --- | --- |
 | 「入口を確かめる」節の行き先 | 0回。組み立てを設計し直すスキル redesign-intent-workflow を足した（redesign-intent-workflow/decisions.md）。6節で行き先を仮にしていた | 行き先を「設計の相談として進めるか、人に聞く」から、redesign-intent-workflow を相対パスで指す形に変えた | 6節の仮の行き先を置き換えた（6節の注は superseded）。持ち主が決めた（2026-11-13）。相対パスで指すので、redesign-intent-workflow も並べて入れる（README） |
+| 「入口を確かめる」節に、設計書から渡された変更を通す段落 | 0回。入口で、隣のスキルとの分担が論点の相談も止めるようにした（6節）。そのため、redesign-intent-workflow の設計書から渡された変更（たとえば description の書き換え）も、入口と P2（2回を待つ）で止まる | 設計書から渡された変更は入口を通し、手順2では、設計書で人が決めたことを、人が1回で直すと決めたもの（P7）として扱う、を足した | P7。redesign-intent-workflow/decisions.md の5節の4行目と同じ変更。下書き（持ち主の確認待ち） |
