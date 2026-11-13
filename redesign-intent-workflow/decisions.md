@@ -14,7 +14,7 @@ redesign-intent-workflow を、create-intent-skill の手順で作ったとき�
 
 ## 1. 参照先
 
-持ち主が挙げた候補を、agent-taxonomy（2026-11-13 の [llms.txt](https://agent-taxonomy.kawaida-dev.com/llms.txt)）のエントリでたどった。上流の原文は、2026-11-13 に既定のブランチの先頭の commit で固定して読んだ。mattpocock-skills と aidlc-workflows は、agent-taxonomy が分析した commit（mattpocock-skills は 4ae2317、aidlc-workflows は 161ddb8）より上流が進んでいたので、上流の版で読んだ（S2）。chief-of-staff の Wiki の節は、上流の版で、共有の wiki を先に探す段落が入っている（上流の changeset `chief-of-staff-shared-wiki-procedures`）。
+持ち主が挙げた候補を、agent-taxonomy（2026-11-13 の [llms.txt](https://agent-taxonomy.kawaida-dev.com/llms.txt)）のエントリでたどった。上流の原文は、2026-11-13 に既定のブランチの先頭の commit で固定して読んだ。mattpocock-skills と aidlc-workflows は、agent-taxonomy が分析した commit（mattpocock-skills は 4ae2317、aidlc-workflows は 161ddb8）より上流が進んでいたので、上流の版で読んだ（S2）。chief-of-staff/SKILL.md は、4ae2317 と 5863806 で同じだった。
 
 | ID  | 参照先 | 読んだもの（commit を固定） | 選んだ理由 |
 | --- | --- | --- | --- |
