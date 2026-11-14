@@ -5,4 +5,4 @@ max_turns: 15
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 
-/kstack:create-intent-skill 汎用のコードレビューのスキルを作って。
+/kstack:intent-skill 汎用のコードレビューのスキルを作って。
