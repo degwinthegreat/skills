@@ -1,3 +1,5 @@
+> 凍結した記録（2026-11-14）。元は `improve-intent-skill/policy.md` にあった。行は足さない。これからの理由は PR の本文とコミットに書く。中の相対リンクは元の置き場からのもので、ここからは切れている。元の置き場で読むには、[移す前の版](https://github.com/degwinthegreat/skills/blob/53681c2f3304818e96fd73ab5e6e1ae1fbc91899/improve-intent-skill/policy.md)を開く。
+
 # improve-intent-skill の方針
 
 improve-intent-skill（既存のスキルを、使って起きた失敗をもとに直すスキル）を設計するときの方針。ルールの採否（decisions.md）は、ここの項目番号で理由を書く。
