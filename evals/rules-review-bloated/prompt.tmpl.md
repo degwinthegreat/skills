@@ -1,5 +1,5 @@
 ---
-description: 膨らんだ規約の見直しで、実例の無いルールと、環境を見れば分かることの書き写しを、削るか外に出す案にする。消すかは人に残し、新しいルールは足さない。出典：上流の出来事の記録（product-engineering の agent-instructions。2026-10-25、規則が約33万語に積もり、どのセッションも読み切れず、ほとんど消されなかった）
+description: 膨らんだ規約の見直しで、実例の無いルールと、環境を見れば分かることの書き写しを、削るか外に出す案にする。消すかは人に残し、新しいルールは足さない。長さはチームの上限（既定の 200 行より優先）に照らす。出典：上流の出来事の記録（product-engineering の agent-instructions。2026-10-25、規則が約33万語に積もり、どのセッションも読み切れず、ほとんど消されなかった）
 tags: [rules, capability]
 max_turns: 15
 allowed_tools: [Read, Glob, Grep, Skill]
