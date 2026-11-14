@@ -6,7 +6,7 @@ Claude Code などのエージェントで使うスキルを置くリポジト�
 
 ## インストール
 
-create-intent-skill、improve-intent-skill、redesign-intent-workflow は、3つ一緒に入れます。improve-intent-skill と redesign-intent-workflow は、隣にある create-intent-skill の手順と共有の方針を読み、互いを行き先として指すからです。cognitive-surrender は、1つだけでも動きます。
+create-intent-skill、improve-intent-skill、redesign-intent-workflow は、3つ一緒に入れます。improve-intent-skill と redesign-intent-workflow は、隣にある create-intent-skill の手順と共有の方針を読み、互いを行き先として指すからです。cognitive-surrender と write-context-doc は、それぞれ1つだけでも動きます。
 
 ### Claude Code の plugin（推奨）
 
@@ -15,16 +15,17 @@ create-intent-skill、improve-intent-skill、redesign-intent-workflow は、3つ
 /plugin install kstack@kstack
 ```
 
-1つの plugin（`kstack`）に4つのスキルが入っています。plugin のスキルには plugin の名前が付くので、`/kstack:create-intent-skill`、`/kstack:improve-intent-skill`、`/kstack:redesign-intent-workflow`、`/kstack:cognitive-surrender` で呼びます。
+1つの plugin（`kstack`）に5つのスキルが入っています。plugin のスキルには plugin の名前が付くので、`/kstack:create-intent-skill`、`/kstack:improve-intent-skill`、`/kstack:redesign-intent-workflow`、`/kstack:cognitive-surrender`、`/kstack:write-context-doc` で呼びます。
 
 ### npx skills
 
 ```sh
 npx skills add degwinthegreat/skills --skill create-intent-skill --skill improve-intent-skill --skill redesign-intent-workflow
 npx skills add degwinthegreat/skills --skill cognitive-surrender
+npx skills add degwinthegreat/skills --skill write-context-doc
 ```
 
-npx で入れるときは、create-intent-skill、improve-intent-skill、redesign-intent-workflow を3つとも入れてください。create-intent-skill が無いと、ほかの2つが動きません。cognitive-surrender は、使うときだけ入れます。こちらは `/create-intent-skill`、`/improve-intent-skill`、`/redesign-intent-workflow`、`/cognitive-surrender` で呼びます。
+npx で入れるときは、create-intent-skill、improve-intent-skill、redesign-intent-workflow を3つとも入れてください。create-intent-skill が無いと、ほかの2つが動きません。cognitive-surrender と write-context-doc は、使うときだけ入れます。こちらは `/create-intent-skill`、`/improve-intent-skill`、`/redesign-intent-workflow`、`/cognitive-surrender`、`/write-context-doc` で呼びます。
 
 ### 手で置く
 
@@ -37,8 +38,9 @@ ln -s "$(pwd)/skills/create-intent-skill" ~/.claude/skills/create-intent-skill
 ln -s "$(pwd)/skills/improve-intent-skill" ~/.claude/skills/improve-intent-skill
 ln -s "$(pwd)/skills/redesign-intent-workflow" ~/.claude/skills/redesign-intent-workflow
 ln -s "$(pwd)/skills/cognitive-surrender" ~/.claude/skills/cognitive-surrender
+ln -s "$(pwd)/skills/write-context-doc" ~/.claude/skills/write-context-doc
 # またはコピー
-cp -R skills/create-intent-skill skills/improve-intent-skill skills/redesign-intent-workflow skills/cognitive-surrender ~/.claude/skills/
+cp -R skills/create-intent-skill skills/improve-intent-skill skills/redesign-intent-workflow skills/cognitive-surrender skills/write-context-doc ~/.claude/skills/
 ```
 
 plugin と手で置いたものの両方があると、両方が読み込まれます。どちらか1つにしてください。
@@ -93,6 +95,16 @@ AI に作業を渡すとき、人がやり方だけを渡して判断を持ち�
 - [decisions.md](cognitive-surrender/decisions.md)：このスキル自身のルールの採否と出典
 
 v0 の試作で、まだ使っていません。create-intent-skill の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。記録を集計する道具が手元にあれば、`cognitive-surrender/local.md` に使い方を書けます。扱いは create-intent-skill の `local.md` と同じです。
+
+## write-context-doc
+
+エージェントが読むチームの文書のうち、規約（CLAUDE.md・AGENTS.md・steering・rules）と仕様を、書く・見直すときに使うスキルです。どのリポジトリでも使えます。推す原則を、あるかないかで判定できる11のチェック（同じ意味は1か所に書く、毎回読まれるファイルに上限を置いて検査で守る、完了の条件を判定できる形で書く、など）として持ち、当たらない所を差し戻しの表にします。書き方の意見が割れている論点（毎回読まれるファイルの上限、禁止の形か望む振る舞いの形か、理由を書くか、手本を指すか載せるか、環境を見れば分かることを書くか）は、スキルが決め打ちしません。既定の推奨を付けて使うチームに聞き、その答えに沿ってチェックします。対象の文書の種類は表で持つので、PR の本文や README などは、あとから行を足せます。特定の製品の設定の書き方は扱いません。
+
+- [SKILL.md](write-context-doc/SKILL.md)：手順
+- [policy.md](write-context-doc/policy.md)：このスキル自身の方針
+- [decisions.md](write-context-doc/decisions.md)：このスキル自身のルールの採否と出典
+
+v0 の試作で、まだ使っていません。create-intent-skill の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。ほかのスキルのファイルを読まないので、1つだけでも入れられます。
 
 ## agent-taxonomy との関係
 
