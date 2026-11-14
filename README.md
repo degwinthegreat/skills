@@ -13,7 +13,7 @@ Claude Code などのエージェントで使うスキルを置くリポジト�
 /plugin install kstack@kstack
 ```
 
-1つの plugin（`kstack`）に、intent-skill、cognitive-surrender、write-agent-rules が入っています。plugin のスキルには plugin の名前が付くので、`/kstack:intent-skill`、`/kstack:cognitive-surrender`、`/kstack:write-agent-rules` で呼びます。
+1つの plugin（`kstack`）に、intent-skill、cognitive-surrender、write-agent-rules、intent-spec が入っています。plugin のスキルには plugin の名前が付くので、`/kstack:intent-skill`、`/kstack:cognitive-surrender`、`/kstack:write-agent-rules`、`/kstack:intent-spec` で呼びます。
 
 ### npx skills
 
@@ -21,9 +21,10 @@ Claude Code などのエージェントで使うスキルを置くリポジト�
 npx skills add degwinthegreat/skills --skill intent-skill
 npx skills add degwinthegreat/skills --skill cognitive-surrender
 npx skills add degwinthegreat/skills --skill write-agent-rules
+npx skills add degwinthegreat/skills --skill intent-spec
 ```
 
-どれも1つだけで動きます。こちらは `/intent-skill`、`/cognitive-surrender`、`/write-agent-rules` で呼びます。
+どれも1つだけで動きます。こちらは `/intent-skill`、`/cognitive-surrender`、`/write-agent-rules`、`/intent-spec` で呼びます。
 
 ### 手で置く
 
@@ -35,8 +36,9 @@ git clone https://github.com/degwinthegreat/skills.git
 ln -s "$(pwd)/skills/intent-skill" ~/.claude/skills/intent-skill
 ln -s "$(pwd)/skills/cognitive-surrender" ~/.claude/skills/cognitive-surrender
 ln -s "$(pwd)/skills/write-agent-rules" ~/.claude/skills/write-agent-rules
+ln -s "$(pwd)/skills/intent-spec" ~/.claude/skills/intent-spec
 # またはコピー
-cp -R skills/intent-skill skills/cognitive-surrender skills/write-agent-rules ~/.claude/skills/
+cp -R skills/intent-skill skills/cognitive-surrender skills/write-agent-rules skills/intent-spec ~/.claude/skills/
 ```
 
 plugin と手で置いたものの両方があると、両方が読み込まれます。どちらか1つにしてください。
@@ -65,13 +67,24 @@ v0 の試作で、まだ使っていません。人が名前で呼ぶスキル�
 
 ## write-agent-rules
 
-エージェントが読むチームの規約（CLAUDE.md・AGENTS.md・steering・rules）を、書く・見直すときに使うスキルです。どのリポジトリでも使えます。規約は、エージェントが良い選択をするための薄い材料にします。チームが選んだことと理由、環境を見ても分からない落とし穴、作業の場面ごとに開く所を書きます。ルールは、実際に起きた誤りがあるものだけにします。見直しでは、実例のある4つの失敗に照らして直し方の表を作ります。4つは、規約が膨らんで読み切れない、規則を判断の時点で読まれない所に置く、記憶に頼る規則を文章だけで守らせる、実例の無いルールが積もる、です。毎回読まれる規約は 200 行以内にし、決まりは「〜する」の形で書き、手本はファイルを指します。チームの規約に決めがあれば、それに従います。仕様は、別のスキルで扱う予定です。特定の製品の設定の書き方は扱いません。
+エージェントが読むチームの規約（CLAUDE.md・AGENTS.md・steering・rules）を、書く・見直すときに使うスキルです。どのリポジトリでも使えます。規約は、エージェントが良い選択をするための薄い材料にします。チームが選んだことと理由、環境を見ても分からない落とし穴、作業の場面ごとに開く所を書きます。ルールは、実際に起きた誤りがあるものだけにします。見直しでは、実例のある4つの失敗に照らして直し方の表を作ります。4つは、規約が膨らんで読み切れない、規則を判断の時点で読まれない所に置く、記憶に頼る規則を文章だけで守らせる、実例の無いルールが積もる、です。毎回読まれる規約は 200 行以内にし、決まりは「〜する」の形で書き、手本はファイルを指します。チームの規約に決めがあれば、それに従います。仕様書は、[intent-spec](#intent-spec) で扱います。特定の製品の設定の書き方は扱いません。
 
 - [SKILL.md](write-agent-rules/SKILL.md)：冒頭の仕様（ユースケース、成功の定義、避けたい失敗の実例）と手順。実例は、product-engineering の agent-instructions の出来事の記録（[receipts.md](https://github.com/phuryn/product-engineering/blob/50ee90fe47b538a0522b7fd35972f52b200f4515/agent-harness/skills/agent-instructions/receipts.md)、[prose-vs-code.md](https://github.com/phuryn/product-engineering/blob/50ee90fe47b538a0522b7fd35972f52b200f4515/agent-harness/skills/agent-instructions/references/prose-vs-code.md)）から
 - このスキル自身のこれまでの方針と決定の記録：[docs/decisions/write-agent-rules/](docs/decisions/write-agent-rules/)（凍結）
 - 評価のケース：[evals/](evals/README.md) の `rules-` で始まる2本
 
 v0 の試作で、まだ使っていません。create-intent-skill（今の intent-skill）の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。ほかのスキルのファイルを読まないので、1つだけでも入れられます。
+
+## intent-spec
+
+設計・仕様書を書くスキルです。入口は3つあります。ゼロから作る、すでにあるプロダクトを参考に作る、すでにある仕様書を更新する、です。人に聞くのは、人しか知らないこと（目的、変えてはいけないもの、成功の定義）だけです。ほかはリポジトリから読み、下書き、自分での点検、文脈を持たない読み手のテストまで、止まらずに進めます。仕様書には、判定できる完了の条件、範囲の外、未決の問い（推測で埋めない）、変えてはいけないもの（既存があるとき）を必ず入れます。リポジトリに用語集や feature map があれば、その語と機能の ID で書きます。無ければ作らずに、使った語の一覧を返します。更新は、足す・変える・消す・名前を変えるの差分で書き、消すものには理由を付けます。
+
+anthropic の product-management の write-spec との違い：write-spec は、PRD の型に沿って、問いを会話で1つずつ重ねて埋めます。intent-spec は、聞くのを人しか知らない3つに限り、既存の仕様書の差分の更新と、変えてはいけないものまでを1回で書き上げます。
+
+- [SKILL.md](intent-spec/SKILL.md)：冒頭の仕様（ユースケース、成功の定義、避けたい失敗）と進め方
+- 評価のケース：[evals/](evals/README.md) の `spec-` で始まる3本
+
+v0 の試作で、まだ使っていません。intent-skill の「作る」の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。ほかのスキルのファイルを読まないので、1つだけでも入れられます。
 
 ## 方針と決定の記録
 
