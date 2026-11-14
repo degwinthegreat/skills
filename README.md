@@ -95,9 +95,9 @@ v0 の試作で、まだ使っていません。create-intent-skill の手順で
 
 エージェントが読むチームの規約（CLAUDE.md・AGENTS.md・steering・rules）を、書く・見直すときに使うスキルです。どのリポジトリでも使えます。規約は、エージェントが良い選択をするための薄い材料にします。チームが選んだことと理由、環境を見ても分からない落とし穴、作業の場面ごとに開く所を書きます。ルールは、実際に起きた誤りがあるものだけにします。見直しでは、実例のある4つの失敗に照らして直し方の表を作ります。4つは、規約が膨らんで読み切れない、規則を判断の時点で読まれない所に置く、記憶に頼る規則を文章だけで守らせる、実例の無いルールが積もる、です。人に聞くのは、規約の長さの上限だけです。チームの規約に決めがあれば、それに従います。仕様は、別のスキルで扱う予定です。特定の製品の設定の書き方は扱いません。
 
-- [SKILL.md](write-agent-rules/SKILL.md)：手順
-- [policy.md](write-agent-rules/policy.md)：このスキル自身の方針
-- [decisions.md](write-agent-rules/decisions.md)：このスキル自身のルールの採否と出典
+- [SKILL.md](write-agent-rules/SKILL.md)：冒頭の仕様（想定するユースケース、成功の定義、避けたい失敗の実例）と手順。実例は、product-engineering の agent-instructions の出来事の記録（[receipts.md](https://github.com/phuryn/product-engineering/blob/50ee90fe47b538a0522b7fd35972f52b200f4515/agent-harness/skills/agent-instructions/receipts.md)、[prose-vs-code.md](https://github.com/phuryn/product-engineering/blob/50ee90fe47b538a0522b7fd35972f52b200f4515/agent-harness/skills/agent-instructions/references/prose-vs-code.md)）から
+- このスキル自身のこれまでの方針と決定の記録：[docs/decisions/write-agent-rules/](docs/decisions/write-agent-rules/)（凍結）
+- 評価のケース：[evals/](evals/README.md) の `rules-` で始まる2本
 
 v0 の試作で、まだ使っていません。create-intent-skill の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。ほかのスキルのファイルを読まないので、1つだけでも入れられます。
 

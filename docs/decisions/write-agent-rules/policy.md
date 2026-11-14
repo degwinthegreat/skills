@@ -1,3 +1,5 @@
+> 凍結した記録（2026-11-14）。元は `write-agent-rules/policy.md` にあった（main には入らないまま移した）。行は足さない。これからの理由は PR の本文とコミットに書く。中の相対リンクは元の置き場からのもので、ここからは切れている。元の置き場で読むには、[移す前の版](https://github.com/degwinthegreat/skills/blob/28d0b32bb4e68c98526eeba4529f520843a04e0d/write-agent-rules/policy.md)を開く。
+
 # write-agent-rules の方針
 
 write-agent-rules（エージェントが読むチームの規約を、薄い判断の材料と、実例のあるルールだけで書く・見直すスキル）を設計するときの方針。ルールの採否（[decisions.md](decisions.md)）は、ここの項目番号で理由を書く。

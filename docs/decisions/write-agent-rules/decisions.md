@@ -1,3 +1,5 @@
+> 凍結した記録（2026-11-14）。元は `write-agent-rules/decisions.md` にあった（main には入らないまま移した）。行は足さない。これからの理由は PR の本文とコミットに書く。中の相対リンクは元の置き場からのもので、ここからは切れている。元の置き場で読むには、[移す前の版](https://github.com/degwinthegreat/skills/blob/28d0b32bb4e68c98526eeba4529f520843a04e0d/write-agent-rules/decisions.md)を開く。
+
 # write-agent-rules の決定の記録
 
 write-agent-rules を、create-intent-skill の手順で作ったときの記録（2026-11-13〜14）。はじめは write-context-doc の名前で、規約と仕様の両方を対象に作った。2026-11-14 に持ち主が、規約だけに絞って名前を変えると決めた（5節）。0〜4節のうち、仕様に関わる記述は、作ったときの記録として残している。理由は [policy.md](policy.md) の項目番号（P1〜P4）と、[共有の方針](https://github.com/degwinthegreat/skills/blob/main/create-intent-skill/shared-policy.md)の S1〜S3 で書く。要旨は、そのルールが write-agent-rules で何を決めるかを、こちらの言葉で書いたもので、原文の訳ではない。
