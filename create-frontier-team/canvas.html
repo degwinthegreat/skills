@@ -6,7 +6,8 @@
 <title>frontier team の流れ</title>
 <!--
   create-frontier-team の描画。外のファイルやネットワークを使わない、単体で開ける1ファイル。
-  設計の JSON は、すぐ下の script の中身を置き換えて埋め込む（JSON の中の </ は <\/ にする）。
+  仕様書の JSON は、すぐ下の script の中身を置き換えて埋め込む（JSON の中の </ は <\/ にする）。
+  JSON の形は create-frontier-team の SKILL.md（進め方の3）の1か所で決める。この HTML が読むのは version 1。
   描画は JSON だけで決まる。列は段の順、行（レーン）は役割の順。
 -->
 <script id="design" type="application/json">/*DESIGN*/null</script>
@@ -77,6 +78,7 @@
   path.edge.back { stroke-dasharray: 6 4; }
   path.edge.fix { stroke: #ea580c; stroke-dasharray: 5 4; }
   path.edge.learn { stroke: var(--upstream); stroke-dasharray: 2 4; stroke-width: 2.2; }
+  .legend .toggles label { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; cursor: pointer; }
   .legend .ln { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--edge); vertical-align: middle; }
   .legend .ln.fix { border-top: 2px dashed #ea580c; }
   .legend .ln.learn { border-top: 2px dotted var(--upstream); }
@@ -120,7 +122,7 @@
     <span><span class="chip layer-upstream">上流</span><span class="chip layer-task">タスク</span></span>
     <span><span class="chip risk-narrow">戻せて狭い</span><span class="chip risk-wide">戻せるが広い</span><span class="chip risk-irreversible">戻せない</span>関門</span>
     <span><span class="chip humanflag">人</span>人を置く関門</span>
-    <span><i class="ln"></i>データ <i class="ln fix"></i>直し <i class="ln learn"></i>学び</span>
+    <span class="toggles">矢印：<label><input type="checkbox" data-edge="data" checked><i class="ln"></i>データ</label><label><input type="checkbox" data-edge="fix" checked><i class="ln fix"></i>直し</label><label><input type="checkbox" data-edge="learn"><i class="ln learn"></i>学び</label></span>
     <span><span class="chip gapflag">足りない</span>破線の枠</span>
   </div>
 </header>
@@ -221,7 +223,7 @@
   const stageName = (id) => stages[stageIx.get(id)].name;
 
   // ---- キャンバス ----
-  const COL_W = 260, NODE_W = 216, HEAD_W = 156, HEAD_H = 44, PAD = 18, GAP_Y = 14, MIN_LANE = 110;
+  const COL_W = 280, NODE_W = 216, HEAD_W = 156, HEAD_H = 44, PAD = 32, GAP_Y = 14, MIN_LANE = 110;
   const world = document.getElementById("world"), svg = document.getElementById("edges"), viewport = document.getElementById("viewport");
   const nodeEls = new Map();
   nodes.forEach((n) => {
@@ -289,37 +291,108 @@
   const defs = s("defs", {});
   [["arrow", "#8a93a6"], ["arrowhl", "#f59e0b"]].forEach(([id, c]) => { const m = s("marker", { id, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" }); m.append(s("path", { d: "M0,0 L10,5 L0,10 z", fill: c })); defs.append(m); });
   svg.append(defs);
-  let backCount = 0;
-  const maxBottom = Math.max(H0, ...[...pos.values()].map((p) => p.y + p.h));
   const edgeEls = [];
   const labelLayer = s("g", {});
-  edges.forEach((e) => {
-    const a = pos.get(e.from), b = pos.get(e.to);
-    let d, back = false;
-    if (b.x > a.x + 1) {
-      const sx = a.x + a.w, sy = a.y + a.h / 2, tx = b.x, ty = b.y + b.h / 2, dx = Math.max(40, (tx - sx) / 2);
-      d = `M${sx},${sy} C${sx + dx},${sy} ${tx - dx},${ty} ${tx},${ty}`;
-    } else if (Math.abs(b.x - a.x) <= 1) {
-      const sx = a.x + a.w, sy = a.y + a.h / 2, tx = b.x + b.w, ty = b.y + b.h / 2;
-      d = `M${sx},${sy} C${sx + 70},${sy} ${tx + 70},${ty} ${tx},${ty}`;
-    } else {
-      back = true; const by = maxBottom + 40 + backCount++ * 26;
-      const sx = a.x + a.w / 2, sy = a.y + a.h, tx = b.x + b.w / 2, ty = b.y + b.h;
-      d = `M${sx},${sy} C${sx},${by} ${tx},${by} ${tx},${ty}`;
+  // 直角に折れる線。縦の線は列の間の溝、横の線はレーンの境目を通す。同じ溝・境目を通る線は少しずつずらす。
+  const gutterX = (c) => HEAD_W + c * COL_W;
+  const laneTop = (r) => laneTops[r][0];
+  const used = new Map();
+  const slot = (key) => { const k = used.get(key) || 0; used.set(key, k + 1); return (k % 2 ? -1 : 1) * Math.ceil(k / 2) * 6; };
+  // 出入りの口は、相手のノードの高さの順に並べる（口の所で線が交わらないように）。
+  const cy = (id) => { const p = pos.get(id); return p.y + p.h / 2; };
+  const portOf = new Map();
+  nodes.forEach((n) => {
+    const outs = edges.filter((e) => e.from === n.id).sort((x, y) => cy(x.to) - cy(y.to));
+    const ins = edges.filter((e) => e.to === n.id).sort((x, y) => cy(x.from) - cy(y.from));
+    outs.forEach((e, k) => { e._sy = cy(n.id) + (k - (outs.length - 1) / 2) * 10; });
+    ins.forEach((e, k) => { e._ty = cy(n.id) + (k - (ins.length - 1) / 2) * 10; });
+  });
+  // 引いた線の縦・横の線分。横の線を通す境目は、これと交わる数がいちばん少ないものを選ぶ。
+  const segs = [];
+  const crossCount = (pts) => {
+    let n = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
+      for (const [u1, v1, u2, v2] of segs) {
+        const h1 = y1 === y2, h2 = v1 === v2;
+        if (h1 === h2) continue;
+        const [hx1, hx2, hy] = h1 ? [Math.min(x1, x2), Math.max(x1, x2), y1] : [Math.min(u1, u2), Math.max(u1, u2), v1];
+        const [vx, vy1, vy2] = h1 ? [u1, Math.min(v1, v2), Math.max(v1, v2)] : [x1, Math.min(y1, y2), Math.max(y1, y2)];
+        if (vx > hx1 && vx < hx2 && hy > vy1 && hy < vy2) n++;
+      }
     }
-    const p = s("path", { d, class: "edge" + (back && e.kind === "data" ? " back" : "") + (e.kind !== "data" ? " " + e.kind : ""), "marker-end": "url(#arrow)" });
+    return n;
+  };
+  const rounded = (pts, r = 7) => {
+    let d = `M${pts[0][0]},${pts[0][1]}`;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const [px, py] = pts[i - 1], [x, y] = pts[i], [nx, ny] = pts[i + 1];
+      const r1 = Math.min(r, Math.hypot(x - px, y - py) / 2, Math.hypot(nx - x, ny - y) / 2);
+      const ax = x - Math.sign(x - px) * r1, ay = y - Math.sign(y - py) * r1, bx = x + Math.sign(nx - x) * r1, by = y + Math.sign(ny - y) * r1;
+      d += ` L${ax},${ay} Q${x},${y} ${bx},${by}`;
+    }
+    const [lx, ly] = pts[pts.length - 1];
+    return d + ` L${lx},${ly}`;
+  };
+  // 短い矢印から順に引く（決まった順なので、同じ仕様書からは同じ図になる）。
+  const span = (e) => Math.abs(stageIx.get(byId.get(e.to).stage) - stageIx.get(byId.get(e.from).stage)) * 10 + Math.abs(roleIx.get(byId.get(e.to).role) - roleIx.get(byId.get(e.from).role));
+  let bottomUsed = 0;
+  const order = edges.map((e, i) => [e, i]).sort((x, y) => span(x[0]) - span(y[0]) || x[1] - y[1]).map(([e]) => e);
+  order.forEach((e) => {
+    const na = byId.get(e.from), nb = byId.get(e.to), a = pos.get(e.from), b = pos.get(e.to);
+    const ca = stageIx.get(na.stage), cb = stageIx.get(nb.stage), ra = roleIx.get(na.role), rb = roleIx.get(nb.role);
+    const sy = e._sy, ty = e._ty;
+    // 前へ進む矢印は右から出て左へ入る。戻る矢印は左から出て右へ入る。同じ列は右から出て右へ入る。
+    const fwd = cb > ca, same = cb === ca;
+    const sx = fwd || same ? a.x + a.w : a.x, tx = fwd ? b.x : b.x + b.w;
+    const c1 = fwd || same ? ca + 1 : ca, c2 = fwd ? cb : cb + 1;
+    let pts;
+    if (c1 === c2) {
+      const gx = gutterX(c1) + slot("g" + c1);
+      pts = [[sx, sy], [gx, sy], [gx, ty], [tx, ty]];
+    } else {
+      // 横の線はレーンの境目を通す。候補は、出る側と入る側のレーンを囲む境目。
+      const lo = Math.min(ra, rb), hi = Math.max(ra, rb) + 1;
+      const x1 = gutterX(c1) + slot("g" + c1), x2 = gutterX(c2) + slot("g" + c2);
+      let best = null;
+      const cands = [...new Set([...Array(hi - lo + 1).keys()].map((k) => lo + k).concat([0, roles.length]))];
+      for (const r of cands) {
+        const ch = (r >= roles.length ? H0 + 16 : laneTop(r)) + ((used.get("h" + r) || 0) % 2 ? -1 : 1) * Math.ceil((used.get("h" + r) || 0) / 2) * 6;
+        const cand = [[sx, sy], [x1, sy], [x1, ch], [x2, ch], [x2, ty], [tx, ty]];
+        const c = crossCount(cand);
+        if (!best || c < best.c) best = { c, r };
+      }
+      const ch = (best.r >= roles.length ? H0 + 16 : laneTop(best.r)) + slot("h" + best.r);
+      if (best.r >= roles.length) bottomUsed = Math.max(bottomUsed, ch);
+      pts = [[sx, sy], [x1, sy], [x1, ch], [x2, ch], [x2, ty], [tx, ty]];
+    }
+    for (let i = 0; i < pts.length - 1; i++) segs.push([pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]]);
+    const p = s("path", { d: rounded(pts), class: "edge" + (e.kind !== "data" ? " " + e.kind : ""), "marker-end": "url(#arrow)" });
     svg.append(p);
-    edgeEls.push({ e, p });
+    const item = { e, p, g: null };
+    edgeEls.push(item);
     if (e.label) {
-      const len = p.getTotalLength(), mid = p.getPointAtLength(len / 2);
-      const t = s("text", { x: mid.x, y: mid.y + 4, "text-anchor": "middle", class: "edge-label" }); t.textContent = (e.kind !== "data" ? EDGE_KIND[e.kind] + "：" : "") + e.label;
+      let best = null;
+      for (let i = 0; i < pts.length - 1; i++) { const [x, y] = pts[i], [nx, ny] = pts[i + 1]; if (y === ny && (!best || Math.abs(nx - x) > best.len)) best = { len: Math.abs(nx - x), x: (x + nx) / 2, y }; }
+      const m = best || { x: (sx + tx) / 2, y: (sy + ty) / 2 };
+      const t = s("text", { x: m.x, y: m.y + 4, "text-anchor": "middle", class: "edge-label" }); t.textContent = (e.kind !== "data" ? EDGE_KIND[e.kind] + "：" : "") + e.label;
       const g = s("g", {}); g.append(t); labelLayer.append(g);
-      e._t = t; e._g = g;
+      e._t = t; e._g = g; item.g = g;
     }
   });
   svg.append(labelLayer);
   edges.forEach((e) => { if (!e._t) return; const bb = e._t.getBBox(); e._g.prepend(s("rect", { x: bb.x - 4, y: bb.y - 2, width: bb.width + 8, height: bb.height + 4, rx: 4, class: "edge-label-bg" })); });
-  const H = maxBottom + (backCount ? 40 + backCount * 26 + 20 : 20);
+  const H = Math.max(H0, bottomUsed) + 24;
+  // 矢印の種類ごとの表示。学びの矢印は最初は隠す。選んだノードにつながる矢印は、隠していても出す。
+  const shown = { data: true, fix: true, learn: false };
+  let selectedId = null;
+  const refreshEdges = () => edgeEls.forEach(({ e, p, g }) => {
+    const on = !!selectedId && (e.from === selectedId || e.to === selectedId);
+    const vis = shown[e.kind] || on;
+    p.style.display = vis ? "" : "none"; if (g) g.style.display = vis ? "" : "none";
+  });
+  document.querySelectorAll("input[data-edge]").forEach((cb) => cb.addEventListener("change", () => { shown[cb.dataset.edge] = cb.checked; refreshEdges(); }));
+  refreshEdges();
   Object.assign(svg.style, { width: W + "px", height: H + "px" }); svg.setAttribute("width", W); svg.setAttribute("height", H);
   world.style.width = W + "px"; world.style.height = H + "px";
 
@@ -343,6 +416,7 @@
   const select = (id) => {
     nodeEls.forEach((e, nid) => e.classList.toggle("selected", nid === id));
     edgeEls.forEach(({ e, p }) => { const on = id && (e.from === id || e.to === id); p.classList.toggle("hl", !!on); p.setAttribute("marker-end", on ? "url(#arrowhl)" : "url(#arrow)"); });
+    selectedId = id; refreshEdges();
     if (!id) { detail.hidden = true; return; }
     const n = byId.get(id);
     const close = el("button", "close", "×"); close.onclick = () => select(null);
@@ -404,6 +478,8 @@
   nodes.filter((n) => n.kind === "gate" && n.risk === "irreversible" && !n.human).forEach((n) => gaps.push(`関門「${n.title}」：戻せない変更を、人を置かずに通している`));
   nodes.filter((n) => (n.kind === "work" || n.kind === "gate") && !n.check).forEach((n) => gaps.push(`「${n.title}」：判定（プログラムで評価できる形）が書かれていない`));
   task.filter((n) => !KIND[n.kind]).forEach((n) => gaps.push(`「${n.title}」：ノードの種類（分ける・実行・コード・関門）が書かれていない`));
+  if (D.version == null) gaps.push("仕様書に version が無い（この図は version 1 の形として読んだ）");
+  else if (Number(D.version) !== 1) gaps.push(`仕様書の version が ${D.version}（この図が読むのは version 1）`);
   arr(D.gaps).forEach((g) => gaps.push(str(typeof g === "object" && g ? (g.text || g.title || JSON.stringify(g)) : g)));
   problems.forEach((p) => gaps.push(p));
   const ul = el("ul", "gaps"); gaps.forEach((g) => ul.append(el("li", null, g)));
