@@ -1,6 +1,6 @@
 {
   "name": "kstack",
-  "description": "intent-skill、cognitive-surrender。意思（解決したいこと）に沿ってスキルを作り、起きた失敗を評価のケースにして直し、複数のスキルにまたがる組み立てを見直す。人が明け渡していた所を見つける",
+  "description": "intent-skill、cognitive-surrender、write-agent-rules。意思（解決したいこと）に沿ってスキルを作り、起きた失敗を評価のケースにして直し、複数のスキルにまたがる組み立てを見直す。人が明け渡していた所を見つける。エージェントが読むチームの規約を、薄い材料と実例のあるルールで書く",
   "author": {
     "name": "degwinthegreat"
   },
@@ -8,6 +8,7 @@
   "license": "MIT",
   "skills": [
     "./intent-skill",
-    "./cognitive-surrender"
+    "./cognitive-surrender",
+    "./write-agent-rules"
   ]
 }

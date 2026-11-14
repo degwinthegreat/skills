@@ -8,7 +8,7 @@
     {
       "name": "kstack",
       "source": "./",
-      "description": "このリポジトリのスキル（intent-skill、cognitive-surrender）を1つにまとめた plugin"
+      "description": "このリポジトリのスキル（intent-skill、cognitive-surrender、write-agent-rules）を1つにまとめた plugin"
     }
   ]
 }
