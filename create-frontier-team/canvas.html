@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>frontier team の流れ</title>
+<!--
+  create-frontier-team の描画。外のファイルやネットワークを使わない、単体で開ける1ファイル。
+  設計の JSON は、すぐ下の script の中身を置き換えて埋め込む（JSON の中の </ は <\/ にする）。
+  描画は JSON だけで決まる。列は段の順、行（レーン）は役割の順。
+-->
+<script id="design" type="application/json">/*DESIGN*/null</script>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1f2430; --sub: #5b6475; --line: #d9dde5;
+    --lane-a: #ffffff; --lane-b: #f9fafc; --upstream: #7c3aed; --upstream-tint: rgba(124,58,237,.06);
+    --task: #0f766e; --plan: #2563eb; --run: #059669; --human: #6b7280; --gap: #dc2626;
+    --edge: #8a93a6; --sel: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; }
+  header .repo { color: var(--sub); font-size: 13px; }
+  nav { display: flex; gap: 4px; margin-left: 8px; }
+  nav button { border: 1px solid var(--line); background: var(--panel); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--ink); }
+  nav button[aria-selected="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+  nav button .count { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 9px; background: var(--gap); color: #fff; font-size: 11px; }
+  .legend { display: flex; gap: 10px; margin-left: auto; font-size: 12px; color: var(--sub); flex-wrap: wrap; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  main { flex: 1; position: relative; min-height: 0; }
+  section { position: absolute; inset: 0; overflow: auto; }
+  section[hidden] { display: none; }
+
+  #viewport { position: absolute; inset: 0; overflow: hidden; cursor: grab; background-image: radial-gradient(#d4d8e0 1px, transparent 1px); background-size: 20px 20px; }
+  #viewport.dragging { cursor: grabbing; }
+  #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+  .lane { position: absolute; border-bottom: 1px solid var(--line); }
+  .lane-head { position: absolute; padding: 12px; font-size: 13px; border-right: 1px solid var(--line); background: var(--panel); }
+  .lane-head b { display: block; font-size: 14px; }
+  .lane-head .decides { display: inline-block; margin-top: 6px; font-size: 11px; color: #fff; background: var(--upstream); padding: 1px 7px; border-radius: 9px; }
+  .col-head { position: absolute; height: 44px; display: flex; align-items: center; justify-content: center; flex-direction: column; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .col-head small { font-weight: 400; color: var(--upstream); font-size: 11px; }
+  .col-tint { position: absolute; background: var(--upstream-tint); }
+
+  .node { position: absolute; width: 216px; background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--task); border-radius: 10px; padding: 9px 10px 10px; font-size: 12px; box-shadow: 0 1px 3px rgba(20,30,50,.08); cursor: pointer; user-select: none; }
+  .node.upstream { border-left-color: var(--upstream); }
+  .node.gap { border: 2px dashed var(--gap); border-left-width: 5px; }
+  .node.selected { box-shadow: 0 0 0 3px var(--sel); }
+  .node .title { font-size: 13px; font-weight: 600; margin-bottom: 6px; line-height: 1.35; }
+  .node .row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 9px; font-size: 11px; line-height: 18px; white-space: nowrap; }
+  .chip.session-plan { background: var(--plan); color: #fff; }
+  .chip.session-run { background: var(--run); color: #fff; }
+  .chip.session-human { background: var(--human); color: #fff; }
+  .chip.unknown { background: #fee2e2; color: var(--gap); }
+  .chip.layer-upstream { border: 1px solid var(--upstream); color: var(--upstream); }
+  .chip.layer-task { border: 1px solid var(--task); color: var(--task); }
+  .chip.skill { background: #eef1f6; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .chip.gapflag { background: var(--gap); color: #fff; }
+  .tool { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px 1px 6px; border-radius: 9px; font-size: 11px; line-height: 18px; border: 1px solid; white-space: nowrap; }
+  .tool i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .node .kind { float: right; font-size: 11px; color: var(--sub); margin-left: 6px; }
+  .node.gate { border-radius: 2px 18px 2px 18px; }
+  .chip.risk-narrow { background: #dcfce7; color: #166534; }
+  .chip.risk-wide { background: #fef3c7; color: #92400e; }
+  .chip.risk-irreversible { background: #fee2e2; color: #991b1b; font-weight: 600; }
+  .chip.humanflag { background: var(--ink); color: #fff; }
+  .node .check { margin-top: 6px; font-size: 11px; color: var(--ink); background: #f3f4f6; border-radius: 6px; padding: 3px 6px; }
+  .node .out { margin-top: 6px; color: var(--sub); font-size: 11px; }
+  .edge-label { font-size: 11px; fill: var(--sub); }
+  .edge-label-bg { fill: var(--bg); }
+  path.edge { fill: none; stroke: var(--edge); stroke-width: 1.6; stroke-opacity: .55; }
+  path.edge.fix, path.edge.learn, path.edge.hl { stroke-opacity: 1; }
+  path.edge.back { stroke-dasharray: 6 4; }
+  path.edge.fix { stroke: #ea580c; stroke-dasharray: 5 4; }
+  path.edge.learn { stroke: var(--upstream); stroke-dasharray: 2 4; stroke-width: 2.2; }
+  .legend .ln { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--edge); vertical-align: middle; }
+  .legend .ln.fix { border-top: 2px dashed #ea580c; }
+  .legend .ln.learn { border-top: 2px dotted var(--upstream); }
+  path.edge.hl { stroke: var(--sel); stroke-width: 2.6; }
+
+  #detail { position: absolute; right: 12px; top: 12px; width: 300px; max-height: calc(100% - 24px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; font-size: 13px; box-shadow: 0 4px 16px rgba(20,30,50,.12); }
+  #detail[hidden] { display: none; }
+  #detail h2 { font-size: 15px; margin: 0 24px 8px 0; }
+  #detail dl { margin: 0; }
+  #detail dt { color: var(--sub); font-size: 11px; margin-top: 9px; }
+  #detail dd { margin: 2px 0 0; display: flex; flex-wrap: wrap; gap: 4px; }
+  #detail .close { position: absolute; right: 10px; top: 8px; border: none; background: none; font-size: 18px; cursor: pointer; color: var(--sub); }
+  #detail .gaptext { color: var(--gap); }
+  .zoom { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 4px; }
+  .zoom button { width: 34px; height: 30px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; cursor: pointer; font-size: 14px; }
+  .zoom button.wide { width: auto; padding: 0 10px; font-size: 12px; }
+
+  .doc { padding: 20px 24px; max-width: 1200px; }
+  table { border-collapse: collapse; width: 100%; background: var(--panel); font-size: 13px; }
+  th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #eef1f6; font-weight: 600; }
+  tr.gaprow td { background: #fff5f5; }
+  td .row { display: flex; flex-wrap: wrap; gap: 4px; }
+  pre.ticket { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
+  ul.gaps li { margin: 6px 0; }
+  .empty { padding: 40px; color: var(--sub); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="teamName">frontier team の流れ</h1>
+  <span class="repo" id="repoName"></span>
+  <nav role="tablist">
+    <button data-tab="canvasView" aria-selected="true">キャンバス</button>
+    <button data-tab="tableView" aria-selected="false">表</button>
+    <button data-tab="ticketView" aria-selected="false">チケットの雛形</button>
+    <button data-tab="gapView" aria-selected="false">足りないもの<span class="count" id="gapCount" hidden></span></button>
+  </nav>
+  <div class="legend">
+    <span><span class="chip session-plan">計画</span><span class="chip session-run">実行</span><span class="chip session-human">人</span>セッション（自動＝スクリプト・CI）</span>
+    <span><span class="chip layer-upstream">上流</span><span class="chip layer-task">タスク</span></span>
+    <span><span class="chip risk-narrow">戻せて狭い</span><span class="chip risk-wide">戻せるが広い</span><span class="chip risk-irreversible">戻せない</span>関門</span>
+    <span><span class="chip humanflag">人</span>人を置く関門</span>
+    <span><i class="ln"></i>データ <i class="ln fix"></i>直し <i class="ln learn"></i>学び</span>
+    <span><span class="chip gapflag">足りない</span>破線の枠</span>
+  </div>
+</header>
+<main>
+  <section id="canvasView">
+    <div id="viewport"><div id="world"><svg id="edges"></svg></div></div>
+    <aside id="detail" hidden></aside>
+    <div class="zoom">
+      <button id="zoomIn" title="拡大">＋</button>
+      <button id="zoomOut" title="縮小">－</button>
+      <button id="zoomFit" class="wide" title="全体を表示">全体</button>
+    </div>
+  </section>
+  <section id="tableView" hidden><div class="doc" id="tableDoc"></div></section>
+  <section id="ticketView" hidden><div class="doc" id="ticketDoc"></div></section>
+  <section id="gapView" hidden><div class="doc" id="gapDoc"></div></section>
+</main>
+<script>
+(() => {
+  "use strict";
+  const DEFAULT_STAGES = [
+    { id: "intent", name: "要求・原則" }, { id: "spec", name: "仕様" }, { id: "tickets", name: "チケット" },
+    { id: "plan", name: "計画（依頼）" }, { id: "run", name: "実行" }, { id: "pr", name: "PR" },
+    { id: "verify", name: "検証" }, { id: "eval", name: "評価" },
+  ];
+  const SESSION = { plan: "計画", run: "実行", human: "人" };
+  const KIND = { split: "⑂ 分ける", work: "▶ 実行", code: "{ } コード", gate: "◇ 関門" };
+  const RISK = { narrow: "戻せて狭い", wide: "戻せるが広い", irreversible: "戻せない" };
+  const EDGE_KIND = { data: "データ", fix: "直し", learn: "学び" };
+  const LAYER = { upstream: "上流", task: "タスク" };
+  const PALETTE = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#16a34a", "#0891b2", "#4f46e5", "#ca8a04", "#475569"];
+
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
+  const str = (v, d = "") => (v == null ? d : String(v));
+  const arr = (v) => (Array.isArray(v) ? v : v == null || v === "" ? [] : [v]);
+  const hashColor = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) >>> 0; return PALETTE[h % PALETTE.length]; };
+  const safeColor = (c, key) => (/^#[0-9a-f]{3,8}$/i.test(str(c)) ? c : hashColor(key));
+
+  // ---- 読み込み ----
+  const raw = document.getElementById("design").textContent.trim();
+  let D = null, parseError = null;
+  if (!raw.startsWith("/*DESIGN*/")) { try { D = JSON.parse(raw); } catch (e) { parseError = e.message; } }
+  if (!D || typeof D !== "object") {
+    document.getElementById("canvasView").replaceChildren(el("div", "empty",
+      parseError ? "設計の JSON を読めませんでした：" + parseError
+                 : "設計の JSON が埋め込まれていません。id=\"design\" の script の中身を JSON に置き換えてください。"));
+    return;
+  }
+
+  // ---- ととのえる（欠けたものは足りないものとして残す） ----
+  const problems = [];
+  const stages = arr(D.stages).length ? arr(D.stages).map((s, i) => ({ id: str(s && s.id, "stage" + i), name: str(s && (s.name || s.id), "段" + (i + 1)) })) : DEFAULT_STAGES.slice();
+  const roles = arr(D.roles).map((r, i) => ({ id: str(r && r.id, "role" + i), name: str(r && (r.name || r.id), "役割" + (i + 1)), people: r && r.people, decides: !!(r && r.decides), note: str(r && r.note) }));
+  const tools = new Map();
+  arr(D.tools).forEach((t, i) => { const id = str(t && t.id, "tool" + i); tools.set(id, { id, name: str(t && (t.name || t.id), id), color: safeColor(t && t.color, id) }); });
+  const toolOf = (id) => { if (!tools.has(id)) tools.set(id, { id, name: id, color: hashColor(id) }); return tools.get(id); };
+
+  const stageIx = new Map(stages.map((s, i) => [s.id, i]));
+  const roleIx = new Map(roles.map((r, i) => [r.id, i]));
+  const nodes = arr(D.nodes).map((n, i) => {
+    n = n || {};
+    const node = {
+      id: str(n.id, "n" + i), title: str(n.title || n.name, "（名前なし）"), stage: str(n.stage), role: str(n.role),
+      skills: arr(n.skills).map(String), session: str(n.session), layer: str(n.layer, "task"), tools: arr(n.tools).map(String),
+      output: str(n.output), gap: str(n.gap), note: str(n.note),
+      kind: str(n.kind), risk: str(n.risk), human: n.human === true, check: str(n.check),
+    };
+    if (!stageIx.has(node.stage)) { const id = node.stage || "_nostage"; if (!stageIx.has(id)) { stageIx.set(id, stages.length); stages.push({ id, name: node.stage || "（段なし）" }); } node.stage = id; }
+    if (!roleIx.has(node.role)) { const id = node.role || "_norole"; if (!roleIx.has(id)) { roleIx.set(id, roles.length); roles.push({ id, name: node.role || "（役割なし）", missing: true }); } node.role = id; }
+    node.missing = [];
+    node.auto = !SESSION[node.session] && (node.kind === "code" || node.kind === "gate");
+    if (!SESSION[node.session] && !node.auto) node.missing.push("セッション");
+    if (roles[roleIx.get(node.role)].missing) node.missing.push("役割");
+    node.isGap = !!node.gap || node.missing.length > 0 || (node.skills.length === 0 && node.session !== "human" && !node.auto && node.kind !== "code");
+    node.tools.forEach(toolOf);
+    return node;
+  });
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const edges = [];
+  arr(D.edges).forEach((e, i) => {
+    e = e || {};
+    const from = str(e.from), to = str(e.to);
+    if (!byId.has(from) || !byId.has(to)) { problems.push(`矢印 ${i + 1}（${from || "?"} → ${to || "?"}）の端のノードが無い`); return; }
+    const kind = EDGE_KIND[str(e.kind)] ? str(e.kind) : "data";
+    edges.push({ from, to, label: str(e.label), kind });
+  });
+
+  document.getElementById("teamName").textContent = str(D.team, "frontier team") + " の流れ";
+  document.getElementById("repoName").textContent = str(D.repo);
+  document.title = str(D.team, "frontier team") + " の流れ";
+
+  // ---- 部品 ----
+  const sessionChip = (s, auto) => auto ? el("span", "chip session-human", "自動") : SESSION[s] ? el("span", "chip session-" + s, SESSION[s]) : el("span", "chip unknown", "セッション不明");
+  const riskChip = (r) => RISK[r] ? el("span", "chip risk-" + r, RISK[r]) : el("span", "chip unknown", "戻しにくさ不明");
+  const layerChip = (l) => el("span", "chip layer-" + (l === "upstream" ? "upstream" : "task"), LAYER[l] || l || "タスク");
+  const toolBadge = (id) => { const t = toolOf(id); const b = el("span", "tool"); b.style.borderColor = t.color; b.style.color = t.color; b.style.background = t.color + "14"; const dot = el("i"); dot.style.background = t.color; b.append(dot, el("span", null, t.name)); return b; };
+  const roleName = (id) => roles[roleIx.get(id)].name;
+  const stageName = (id) => stages[stageIx.get(id)].name;
+
+  // ---- キャンバス ----
+  const COL_W = 260, NODE_W = 216, HEAD_W = 156, HEAD_H = 44, PAD = 18, GAP_Y = 14, MIN_LANE = 110;
+  const world = document.getElementById("world"), svg = document.getElementById("edges"), viewport = document.getElementById("viewport");
+  const nodeEls = new Map();
+  nodes.forEach((n) => {
+    const d = el("div", "node" + (n.layer === "upstream" ? " upstream" : "") + (n.kind === "gate" ? " gate" : "") + (n.isGap ? " gap" : ""));
+    d.dataset.id = n.id;
+    if (KIND[n.kind]) d.append(el("span", "kind", KIND[n.kind]));
+    d.append(el("div", "title", n.title));
+    const r1 = el("div", "row"); r1.append(sessionChip(n.session, n.auto), layerChip(n.layer));
+    if (n.kind === "gate") r1.append(riskChip(n.risk));
+    if (n.human) r1.append(el("span", "chip humanflag", "人"));
+    if (n.isGap) r1.append(el("span", "chip gapflag", "足りない")); d.append(r1);
+    if (n.skills.length) { const r = el("div", "row"); n.skills.forEach((s) => r.append(el("span", "chip skill", s))); d.append(r); }
+    if (n.tools.length) { const r = el("div", "row"); n.tools.forEach((t) => r.append(toolBadge(t))); d.append(r); }
+    if (n.check) d.append(el("div", "check", "判定：" + n.check));
+    if (n.output) d.append(el("div", "out", "→ " + n.output));
+    world.append(d); nodeEls.set(n.id, d);
+  });
+
+  // 高さを測ってから、決まった順で置く
+  const pos = new Map();
+  const cells = new Map();
+  nodes.forEach((n) => { const k = roleIx.get(n.role) + ":" + stageIx.get(n.stage); if (!cells.has(k)) cells.set(k, []); cells.get(k).push(n); });
+  let y = HEAD_H;
+  const laneTops = [];
+  roles.forEach((r, ri) => {
+    let laneH = MIN_LANE;
+    stages.forEach((s, si) => { const list = cells.get(ri + ":" + si) || []; const h = list.reduce((a, n) => a + nodeEls.get(n.id).offsetHeight, 0) + Math.max(0, list.length - 1) * GAP_Y + PAD * 2; laneH = Math.max(laneH, h); });
+    laneTops.push([y, laneH]);
+    stages.forEach((s, si) => {
+      let cy = y + PAD;
+      (cells.get(ri + ":" + si) || []).forEach((n) => {
+        const e = nodeEls.get(n.id), h = e.offsetHeight, x = HEAD_W + si * COL_W + (COL_W - NODE_W) / 2;
+        e.style.left = x + "px"; e.style.top = cy + "px"; pos.set(n.id, { x, y: cy, w: NODE_W, h }); cy += h + GAP_Y;
+      });
+    });
+    y += laneH;
+  });
+  const W = HEAD_W + stages.length * COL_W, H0 = y;
+
+  // 背景：上流の列の色、レーン、見出し
+  const bg = document.createDocumentFragment();
+  stages.forEach((s, si) => {
+    const inStage = nodes.filter((n) => n.stage === s.id);
+    const upstream = inStage.length > 0 && inStage.every((n) => n.layer === "upstream");
+    if (upstream) { const t = el("div", "col-tint"); Object.assign(t.style, { left: HEAD_W + si * COL_W + "px", top: 0, width: COL_W + "px", height: H0 + "px" }); bg.append(t); }
+    const h = el("div", "col-head"); Object.assign(h.style, { left: HEAD_W + si * COL_W + "px", top: 0, width: COL_W + "px" });
+    h.append(el("span", null, s.name)); if (upstream) h.append(el("small", null, "上流")); bg.append(h);
+  });
+  roles.forEach((r, ri) => {
+    const [top, h] = laneTops[ri];
+    const lane = el("div", "lane"); Object.assign(lane.style, { left: HEAD_W + "px", top: top + "px", width: W - HEAD_W + "px", height: h + "px", background: ri % 2 ? "var(--lane-b)" : "var(--lane-a)" }); bg.append(lane);
+    const head = el("div", "lane-head"); Object.assign(head.style, { left: 0, top: top + "px", width: HEAD_W + "px", height: h + "px" });
+    head.append(el("b", null, r.name));
+    if (r.people != null) head.append(el("span", null, r.people + " 人"));
+    if (r.decides) head.append(el("span", "decides", "決める役"));
+    if (r.missing) head.append(el("span", "chip unknown", "役割が設計に無い"));
+    bg.append(head);
+  });
+  const corner = el("div", "col-head"); Object.assign(corner.style, { left: 0, top: 0, width: HEAD_W + "px" }); corner.append(el("span", null, "役割 ＼ 段")); bg.append(corner);
+  world.prepend(bg);
+
+  // 矢印
+  const NS = "http://www.w3.org/2000/svg";
+  const s = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  const defs = s("defs", {});
+  [["arrow", "#8a93a6"], ["arrowhl", "#f59e0b"]].forEach(([id, c]) => { const m = s("marker", { id, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" }); m.append(s("path", { d: "M0,0 L10,5 L0,10 z", fill: c })); defs.append(m); });
+  svg.append(defs);
+  let backCount = 0;
+  const maxBottom = Math.max(H0, ...[...pos.values()].map((p) => p.y + p.h));
+  const edgeEls = [];
+  const labelLayer = s("g", {});
+  edges.forEach((e) => {
+    const a = pos.get(e.from), b = pos.get(e.to);
+    let d, back = false;
+    if (b.x > a.x + 1) {
+      const sx = a.x + a.w, sy = a.y + a.h / 2, tx = b.x, ty = b.y + b.h / 2, dx = Math.max(40, (tx - sx) / 2);
+      d = `M${sx},${sy} C${sx + dx},${sy} ${tx - dx},${ty} ${tx},${ty}`;
+    } else if (Math.abs(b.x - a.x) <= 1) {
+      const sx = a.x + a.w, sy = a.y + a.h / 2, tx = b.x + b.w, ty = b.y + b.h / 2;
+      d = `M${sx},${sy} C${sx + 70},${sy} ${tx + 70},${ty} ${tx},${ty}`;
+    } else {
+      back = true; const by = maxBottom + 40 + backCount++ * 26;
+      const sx = a.x + a.w / 2, sy = a.y + a.h, tx = b.x + b.w / 2, ty = b.y + b.h;
+      d = `M${sx},${sy} C${sx},${by} ${tx},${by} ${tx},${ty}`;
+    }
+    const p = s("path", { d, class: "edge" + (back && e.kind === "data" ? " back" : "") + (e.kind !== "data" ? " " + e.kind : ""), "marker-end": "url(#arrow)" });
+    svg.append(p);
+    edgeEls.push({ e, p });
+    if (e.label) {
+      const len = p.getTotalLength(), mid = p.getPointAtLength(len / 2);
+      const t = s("text", { x: mid.x, y: mid.y + 4, "text-anchor": "middle", class: "edge-label" }); t.textContent = (e.kind !== "data" ? EDGE_KIND[e.kind] + "：" : "") + e.label;
+      const g = s("g", {}); g.append(t); labelLayer.append(g);
+      e._t = t; e._g = g;
+    }
+  });
+  svg.append(labelLayer);
+  edges.forEach((e) => { if (!e._t) return; const bb = e._t.getBBox(); e._g.prepend(s("rect", { x: bb.x - 4, y: bb.y - 2, width: bb.width + 8, height: bb.height + 4, rx: 4, class: "edge-label-bg" })); });
+  const H = maxBottom + (backCount ? 40 + backCount * 26 + 20 : 20);
+  Object.assign(svg.style, { width: W + "px", height: H + "px" }); svg.setAttribute("width", W); svg.setAttribute("height", H);
+  world.style.width = W + "px"; world.style.height = H + "px";
+
+  // パンとズーム
+  let k = 1, tx = 0, ty = 0;
+  const apply = () => { world.style.transform = `translate(${tx}px,${ty}px) scale(${k})`; };
+  const zoomAt = (f, cx, cy) => { const nk = Math.min(2.5, Math.max(0.2, k * f)); tx = cx - (cx - tx) * (nk / k); ty = cy - (cy - ty) * (nk / k); k = nk; apply(); };
+  const fit = () => { const vw = viewport.clientWidth, vh = viewport.clientHeight; k = Math.min(1, (vw - 40) / W, (vh - 40) / H); tx = (vw - W * k) / 2; ty = Math.max(20, (vh - H * k) / 2); apply(); };
+  viewport.addEventListener("wheel", (ev) => { ev.preventDefault(); const r = viewport.getBoundingClientRect(); zoomAt(Math.exp(-ev.deltaY * 0.0015), ev.clientX - r.left, ev.clientY - r.top); }, { passive: false });
+  let drag = null;
+  viewport.addEventListener("pointerdown", (ev) => { if (ev.target.closest(".node")) return; drag = { x: ev.clientX - tx, y: ev.clientY - ty, moved: false }; viewport.classList.add("dragging"); viewport.setPointerCapture(ev.pointerId); });
+  viewport.addEventListener("pointermove", (ev) => { if (!drag) return; tx = ev.clientX - drag.x; ty = ev.clientY - drag.y; drag.moved = true; apply(); });
+  viewport.addEventListener("pointerup", (ev) => { if (drag && !drag.moved) select(null); drag = null; viewport.classList.remove("dragging"); });
+  const center = () => [viewport.clientWidth / 2, viewport.clientHeight / 2];
+  document.getElementById("zoomIn").onclick = () => zoomAt(1.2, ...center());
+  document.getElementById("zoomOut").onclick = () => zoomAt(1 / 1.2, ...center());
+  document.getElementById("zoomFit").onclick = fit;
+
+  // 詳細
+  const detail = document.getElementById("detail");
+  const select = (id) => {
+    nodeEls.forEach((e, nid) => e.classList.toggle("selected", nid === id));
+    edgeEls.forEach(({ e, p }) => { const on = id && (e.from === id || e.to === id); p.classList.toggle("hl", !!on); p.setAttribute("marker-end", on ? "url(#arrowhl)" : "url(#arrow)"); });
+    if (!id) { detail.hidden = true; return; }
+    const n = byId.get(id);
+    const close = el("button", "close", "×"); close.onclick = () => select(null);
+    const dl = el("dl");
+    const item = (label, ...content) => { dl.append(el("dt", null, label)); const dd = el("dd"); content.forEach((c) => dd.append(typeof c === "string" ? el("span", null, c) : c)); dl.append(dd); };
+    item("段", stageName(n.stage));
+    item("役割", roleName(n.role));
+    item("セッション", sessionChip(n.session, n.auto));
+    item("層", layerChip(n.layer));
+    item("種類", KIND[n.kind] || "不明");
+    if (n.kind === "gate") item("戻しにくさ", riskChip(n.risk));
+    if (n.human) item("人", el("span", "chip humanflag", "人を置く関門"));
+    if (n.check) item("判定", n.check);
+    item("スキル", ...(n.skills.length ? n.skills.map((x) => el("span", "chip skill", x)) : ["無し"]));
+    item("ツール", ...(n.tools.length ? n.tools.map(toolBadge) : ["無し"]));
+    if (n.output) item("成果物", n.output);
+    const tag = (e) => (e.kind !== "data" ? `［${EDGE_KIND[e.kind]}］` : "") + (e.label ? `（${e.label}）` : "");
+    const ins = edges.filter((e) => e.to === id).map((e) => byId.get(e.from).title + tag(e));
+    const outs = edges.filter((e) => e.from === id).map((e) => byId.get(e.to).title + tag(e));
+    item("受け取る", ins.length ? ins.join("、") : "無し");
+    item("渡す", outs.length ? outs.join("、") : "無し");
+    if (n.note) item("メモ", n.note);
+    if (n.isGap) { const g = el("span", "gaptext", n.gap || ("欠けている：" + (n.missing.length ? n.missing.join("、") : "スキル"))); item("足りないもの", g); }
+    detail.replaceChildren(close, el("h2", null, n.title), dl); detail.hidden = false;
+  };
+  nodeEls.forEach((e, id) => e.addEventListener("click", (ev) => { ev.stopPropagation(); select(id); }));
+
+  // ---- 表 ----
+  const sorted = nodes.slice().sort((a, b) => stageIx.get(a.stage) - stageIx.get(b.stage) || roleIx.get(a.role) - roleIx.get(b.role));
+  const table = el("table"), thead = el("tr");
+  ["段", "役割", "ノード", "種類", "スキル", "セッション", "ツール", "成果物", "層"].forEach((h) => thead.append(el("th", null, h)));
+  table.append(thead);
+  sorted.forEach((n) => {
+    const tr = el("tr", n.isGap ? "gaprow" : "");
+    const cell = (...c) => { const td = el("td"); const r = el("div", "row"); c.forEach((x) => r.append(typeof x === "string" ? el("span", null, x) : x)); td.append(r); tr.append(td); };
+    cell(stageName(n.stage)); cell(roleName(n.role)); cell(n.title);
+    cell(...[KIND[n.kind] || "—"].concat(n.kind === "gate" ? [riskChip(n.risk)] : [], n.human ? [el("span", "chip humanflag", "人")] : []));
+    cell(...(n.skills.length ? n.skills.map((x) => el("span", "chip skill", x)) : [el("span", "chip gapflag", "無し")]));
+    cell(sessionChip(n.session, n.auto)); cell(...(n.tools.length ? n.tools.map(toolBadge) : ["—"])); cell(n.output || "—"); cell(layerChip(n.layer));
+    table.append(tr);
+  });
+  document.getElementById("tableDoc").replaceChildren(el("h2", null, "役割 × 段 × スキル × セッション × ツール"), table);
+
+  // ---- チケットの雛形 ----
+  const tt = str(D.ticket_template);
+  document.getElementById("ticketDoc").replaceChildren(el("h2", null, "チケットの雛形"), tt ? el("pre", "ticket", tt) : el("p", "empty", "設計にチケットの雛形がありません。"));
+
+  // ---- 足りないもの ----
+  const gaps = [];
+  stages.forEach((s) => { const inStage = nodes.filter((n) => n.stage === s.id); if (!inStage.length) gaps.push(`段「${s.name}」にノードが無い`); else if (inStage.every((n) => n.isGap)) gaps.push(`段「${s.name}」に、スキルの決まったノードが無い`); });
+  nodes.filter((n) => n.isGap).forEach((n) => gaps.push(`${stageName(n.stage)} / ${roleName(n.role)} の「${n.title}」：${n.gap || "欠けている：" + (n.missing.length ? n.missing.join("、") : "スキル")}`));
+  const task = nodes.filter((n) => n.layer !== "upstream");
+  if (!edges.some((e) => e.kind === "learn")) gaps.push("学びの辺が無い（評価から、分ける所の指示か上流へ戻す矢印）。速くはなっても、賢くならない");
+  if (!edges.some((e) => e.kind === "fix")) gaps.push("直しの辺が無い（関門から、その単位を作った実行へ差し戻す矢印）");
+  const humans = nodes.filter((n) => n.human);
+  if (humans.length !== 1) gaps.push(`人を置く関門が ${humans.length} か所（1か所、いちばん重くて戻しにくい所に置く）`);
+  task.filter((n) => n.session === "human" && !n.human).forEach((n) => gaps.push(`「${n.title}」：タスクの流れの途中に人がいる。人を置くのは1か所に絞る`));
+  nodes.filter((n) => n.kind === "gate" && !RISK[n.risk]).forEach((n) => gaps.push(`関門「${n.title}」：戻しにくさが書かれていない`));
+  nodes.filter((n) => n.kind === "gate" && n.risk === "irreversible" && !n.human).forEach((n) => gaps.push(`関門「${n.title}」：戻せない変更を、人を置かずに通している`));
+  nodes.filter((n) => (n.kind === "work" || n.kind === "gate") && !n.check).forEach((n) => gaps.push(`「${n.title}」：判定（プログラムで評価できる形）が書かれていない`));
+  task.filter((n) => !KIND[n.kind]).forEach((n) => gaps.push(`「${n.title}」：ノードの種類（分ける・実行・コード・関門）が書かれていない`));
+  arr(D.gaps).forEach((g) => gaps.push(str(typeof g === "object" && g ? (g.text || g.title || JSON.stringify(g)) : g)));
+  problems.forEach((p) => gaps.push(p));
+  const ul = el("ul", "gaps"); gaps.forEach((g) => ul.append(el("li", null, g)));
+  document.getElementById("gapDoc").replaceChildren(el("h2", null, "足りないもの"), gaps.length ? ul : el("p", null, "見つかりませんでした。"));
+  const gc = document.getElementById("gapCount"); if (gaps.length) { gc.textContent = gaps.length; gc.hidden = false; }
+
+  // ---- タブ ----
+  document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+    document.querySelectorAll("main > section").forEach((sec) => { sec.hidden = sec.id !== b.dataset.tab; });
+    if (b.dataset.tab === "canvasView") fit();
+  }));
+  fit();
+  window.addEventListener("resize", fit);
+})();
+</script>
+</body>
+</html>
