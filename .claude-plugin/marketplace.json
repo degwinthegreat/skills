@@ -8,7 +8,7 @@
     {
       "name": "kstack",
       "source": "./",
-      "description": "このリポジトリのスキル（create-intent-skill、improve-intent-skill、redesign-intent-workflow、cognitive-surrender、write-context-doc）を1つにまとめた plugin。スキルが隣のスキルの手順を読むことがあるので、スキルを分けずに、足すときもこの plugin に入れる"
+      "description": "このリポジトリのスキル（create-intent-skill、improve-intent-skill、redesign-intent-workflow、cognitive-surrender、write-agent-rules）を1つにまとめた plugin。スキルが隣のスキルの手順を読むことがあるので、スキルを分けずに、足すときもこの plugin に入れる"
     }
   ]
 }

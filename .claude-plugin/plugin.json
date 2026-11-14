@@ -1,6 +1,6 @@
 {
   "name": "kstack",
-  "description": "create-intent-skill、improve-intent-skill、redesign-intent-workflow、cognitive-surrender、write-context-doc。意思（解決したいこと）に沿ってスキルを作り、使って起きた失敗の記録から直し、複数のスキルにまたがる組み立てを設計し直し、人が明け渡していた所を見つけ、エージェントが読むチームの規約と仕様を差し戻せる形のチェックで書く",
+  "description": "create-intent-skill、improve-intent-skill、redesign-intent-workflow、cognitive-surrender、write-agent-rules。意思（解決したいこと）に沿ってスキルを作り、使って起きた失敗の記録から直し、複数のスキルにまたがる組み立てを設計し直し、人が明け渡していた所を見つけ、エージェントが読むチームの規約を差し戻せる形のチェックで書く",
   "author": {
     "name": "degwinthegreat"
   },
@@ -11,6 +11,6 @@
     "./improve-intent-skill",
     "./redesign-intent-workflow",
     "./cognitive-surrender",
-    "./write-context-doc"
+    "./write-agent-rules"
   ]
 }
