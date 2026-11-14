@@ -5,7 +5,7 @@ max_turns: 15
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 
-/kstack:create-intent-skill コミットのメッセージを書くスキルを作りたい。
+/kstack:intent-skill コミットのメッセージを書くスキルを作りたい。
 
 方針は、次の内容で私が OK した。
 

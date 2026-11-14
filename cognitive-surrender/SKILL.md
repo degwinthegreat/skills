@@ -1,6 +1,6 @@
 ---
 name: cognitive-surrender
-description: 週に一度、人が確かめずに通したものを記録から抜き取り、任せただけか、明け渡していたかを見分ける。見つけたものは直さず、retro と improve-intent-skill に渡す
+description: 週に一度、人が確かめずに通したものを記録から抜き取り、任せただけか、明け渡していたかを見分ける。見つけたものは直さず、retro と intent-skill（直す）に渡す
 disable-model-invocation: true
 ---
 
@@ -73,7 +73,7 @@ disable-model-invocation: true
 
 直さない。渡すのは「明け渡していた」ものだけ。「任せただけ」と「決められない」は渡さない。
 
-- 原因がスキルの本文にある → improve-intent-skill に渡す
+- 原因がスキルの本文にある → intent-skill の「直す」に渡す
 - それ以外（作業の進め方） → retro に渡す。retro が無い環境では、人に渡す
 
 渡す1件ごとに、出典、何が通ったか、確かめ役が見つけた実際の問題を書く。次の対策のうち、当たるものだけを添える。

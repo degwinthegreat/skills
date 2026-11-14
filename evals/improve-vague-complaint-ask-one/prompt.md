@@ -5,7 +5,7 @@ max_turns: 15
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 
-/kstack:improve-intent-skill 下のスキル、なんか改善が必要だと思う。
+/kstack:intent-skill 下のスキル、なんか改善が必要だと思う。
 
 ```markdown
 ---
