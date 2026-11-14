@@ -8,7 +8,7 @@
     {
       "name": "kstack",
       "source": "./",
-      "description": "このリポジトリのスキル（intent-skill、cognitive-surrender）を1つにまとめた plugin。create-intent-skill・improve-intent-skill・redesign-intent-workflow は intent-skill にまとめ、案内だけを1つの版のあいだ残す"
+      "description": "このリポジトリのスキル（intent-skill、cognitive-surrender）を1つにまとめた plugin"
     }
   ]
 }

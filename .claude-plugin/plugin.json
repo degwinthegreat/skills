@@ -8,9 +8,6 @@
   "license": "MIT",
   "skills": [
     "./intent-skill",
-    "./cognitive-surrender",
-    "./create-intent-skill",
-    "./improve-intent-skill",
-    "./redesign-intent-workflow"
+    "./cognitive-surrender"
   ]
 }
