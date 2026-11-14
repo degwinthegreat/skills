@@ -1,3 +1,5 @@
+> 凍結した記録（2026-11-14）。元は `create-intent-skill/decisions.md` にあった。行は足さない。これからの理由は PR の本文とコミットに書く。中の相対リンクは元の置き場からのもので、ここからは切れている。元の置き場で読むには、[移す前の版](https://github.com/degwinthegreat/skills/blob/53681c2f3304818e96fd73ab5e6e1ae1fbc91899/create-intent-skill/decisions.md)を開く。
+
 # create-intent-skill の決定の記録
 
 create-intent-skill を、create-intent-skill 自身の手順で作ったときの記録（2026-11-11）。最初は agent-taxonomy のリポジトリに置いていた。同じ日に、正本をこのリポジトリに移した（中身だけで、履歴は持ち込んでいない）。理由は [policy.md](policy.md) の項目番号（P1〜P6）で書く。要旨は、そのルールが create-intent-skill で何を決めるかを、こちらの言葉で書いたもので、原文の訳ではない。

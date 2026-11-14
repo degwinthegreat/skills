@@ -1,3 +1,5 @@
+> 凍結した記録（2026-11-14）。元は `redesign-intent-workflow/decisions.md` にあった。行は足さない。これからの理由は PR の本文とコミットに書く。中の相対リンクは元の置き場からのもので、ここからは切れている。元の置き場で読むには、[移す前の版](https://github.com/degwinthegreat/skills/blob/53681c2f3304818e96fd73ab5e6e1ae1fbc91899/redesign-intent-workflow/decisions.md)を開く。
+
 # redesign-intent-workflow の決定の記録
 
 redesign-intent-workflow を、create-intent-skill の手順で作ったときの記録（2026-11-13）。理由は [policy.md](policy.md) の項目番号（P1〜P8）と、[共有の方針](../create-intent-skill/shared-policy.md)の S1〜S3 で書く。要旨は、そのルールが redesign-intent-workflow で何を決めるかを、こちらの言葉で書いたもので、原文の訳ではない。

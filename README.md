@@ -6,7 +6,7 @@ Claude Code などのエージェントで使うスキルを置くリポジト�
 
 ## インストール
 
-create-intent-skill、improve-intent-skill、redesign-intent-workflow は、3つ一緒に入れます。improve-intent-skill と redesign-intent-workflow は、隣にある create-intent-skill の手順と共有の方針を読み、互いを行き先として指すからです。cognitive-surrender は、1つだけでも動きます。
+create-intent-skill、improve-intent-skill、redesign-intent-workflow は、3つ一緒に入れます。improve-intent-skill と redesign-intent-workflow は、隣にある create-intent-skill の手順を読み、互いを行き先として指すからです。cognitive-surrender は、1つだけでも動きます。
 
 ### Claude Code の plugin（推奨）
 
@@ -48,13 +48,11 @@ plugin と手で置いたものの両方があると、両方が読み込まれ�
 ほかの人のスキルをいくつも参考にしてスキルを書くと、ルールが混ざって筋がぶれます。create-intent-skill では、先に「何を解決したいか」を方針として下書きして人が確かめ、参照先のルールはその方針に役立つものだけを採ります。出力は、プロジェクト用の `SKILL.md` と、方針の `policy.md`、ルールごとの採否と出典を残す `decisions.md` の3つです。
 
 - [SKILL.md](create-intent-skill/SKILL.md)：手順
-- [policy.md](create-intent-skill/policy.md)：このスキル自身の方針
-- [decisions.md](create-intent-skill/decisions.md)：このスキル自身のルールの採否と出典、見直しの記録
-- [shared-policy.md](create-intent-skill/shared-policy.md)：このリポジトリのスキルに共通する方針。各スキルの policy.md から指す。npx skills でスキルを1つずつ入れたときにも届くよう、create-intent-skill のフォルダに置いている
+- このスキル自身のこれまでの方針と決定の記録：[docs/decisions/create-intent-skill/](docs/decisions/create-intent-skill/)（凍結）
 
 ### 状態
 
-v0 の試作です。最初に3つのスキルを作って1回見直しました（[decisions.md](create-intent-skill/decisions.md) の「5. v0 の見直し」）。手順やファイルの形は、使いながら変わります。
+v0 の試作です。最初に3つのスキルを作って1回見直しました（[decisions.md](docs/decisions/create-intent-skill/decisions.md) の「5. v0 の見直し」）。手順やファイルの形は、使いながら変わります。
 
 ### 入れ方
 
@@ -69,8 +67,7 @@ v0 の試作です。最初に3つのスキルを作って1回見直しました
 既存のスキルを、使って起きた失敗の記録から直すスキルです。まず `policy.md` を読んで、スキルの意図を取り戻します。そのうえで、同じ失敗が2回起きたものだけを、削る → 直す → 足すの順で直します。どの変更がどの失敗のためかを、`decisions.md` に残します。`policy.md` と `decisions.md` の形は create-intent-skill と共通なので、どちらで作ったスキルも扱えます。どちらのファイルも無いスキルには、横に足します。
 
 - [SKILL.md](improve-intent-skill/SKILL.md)：手順
-- [policy.md](improve-intent-skill/policy.md)：このスキル自身の方針
-- [decisions.md](improve-intent-skill/decisions.md)：このスキル自身のルールの採否と出典
+- このスキル自身のこれまでの方針と決定の記録：[docs/decisions/improve-intent-skill/](docs/decisions/improve-intent-skill/)（凍結）
 
 v0 の試作で、まだ使っていません。数えられる失敗が無い相談や、複数のスキルにまたがる組み立てを変える相談では、入口で止まり、redesign-intent-workflow を指します。create-intent-skill の手順1を相対パスで読むので、3つのスキルを同じフォルダに並べて入れます（[インストール](#インストール)）。`local.md` の扱いは、create-intent-skill と同じです。
 
@@ -79,8 +76,7 @@ v0 の試作で、まだ使っていません。数えられる失敗が無い�
 いくつものスキルが読む置き場（決定の記録、守る制約の一覧など）の組み立てに違和感があるとき、それは数えられる失敗として残りません。1つのスキルを最小の変更で直しても消えません。redesign-intent-workflow は、複数のスキルにまたがる組み立て（置き場・読み手・信頼の順・スキルの分担）を設計し直すスキルです。直すのが1つのスキルでも、論点が隣のスキルとの分担（いつ呼ばれるか＝description、何を持つか、どこで渡すか）なら、このスキルで受けます。たとえば、PR を作るスキルの description を、文章を書くスキルとの関係を見て直す相談です。今の形と、スキルどうしの関係を棚卸しし、agent-taxonomy で同じ分野のスキルの分け方と description の書き方を比べ、困りごとを読み手ごとに分け、案を並べて、決めたいことを推奨付きで聞きます。そのうえでチーム向けの設計書を書き、移行を create-intent-skill か improve-intent-skill に渡せる大きさの PR に分けます。スキルの本文は、このスキルでは直しません。improve-intent-skill は、こうした相談が来ると入口で止まり、このスキルを指します。
 
 - [SKILL.md](redesign-intent-workflow/SKILL.md)：手順
-- [policy.md](redesign-intent-workflow/policy.md)：このスキル自身の方針
-- [decisions.md](redesign-intent-workflow/decisions.md)：このスキル自身のルールの採否と出典
+- このスキル自身のこれまでの方針と決定の記録：[docs/decisions/redesign-intent-workflow/](docs/decisions/redesign-intent-workflow/)（凍結）
 
 v0 の試作で、まだ使っていません。create-intent-skill の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。create-intent-skill と improve-intent-skill を相対パスで読むので、3つを同じフォルダに並べて入れます（[インストール](#インストール)）。
 
@@ -89,10 +85,13 @@ v0 の試作で、まだ使っていません。create-intent-skill の手順で
 AI に作業を渡すとき、人がやり方だけを渡して判断を持ち続けているのか（任せる）、自分の答えを持たないまま出力を受け入れているのか（明け渡す）は、履歴に残りません。cognitive-surrender は、週に一度、人に一問だけ聞き、Claude Code のセッションの記録と git、プルリクエストの履歴から、確かめずに通したものを2〜3件選びます。それを、文脈を引き継がない別のエージェントに確かめさせ、任せただけか、明け渡していたかを見分けます。見つけたものは直さず、スキルが原因なら improve-intent-skill に、作業の進め方なら retro に渡します。用語は Addy Osmani の記事 [Cognitive Surrender](https://addyosmani.com/blog/cognitive-surrender/) の区別に揃えています。
 
 - [SKILL.md](cognitive-surrender/SKILL.md)：手順
-- [policy.md](cognitive-surrender/policy.md)：このスキル自身の方針
-- [decisions.md](cognitive-surrender/decisions.md)：このスキル自身のルールの採否と出典
+- このスキル自身のこれまでの方針と決定の記録：[docs/decisions/cognitive-surrender/](docs/decisions/cognitive-surrender/)（凍結）
 
 v0 の試作で、まだ使っていません。create-intent-skill の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。記録を集計する道具が手元にあれば、`cognitive-surrender/local.md` に使い方を書けます。扱いは create-intent-skill の `local.md` と同じです。
+
+## 方針と決定の記録
+
+これまで各スキルのフォルダにあった `policy.md`・`decisions.md` と共有の方針は、[docs/decisions/](docs/decisions/README.md) に移して凍結しました。スキルの実行では読みません。これからの変更の理由は、PR の本文とコミットに書きます。
 
 ## 評価
 
