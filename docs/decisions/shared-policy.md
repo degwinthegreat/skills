@@ -1,3 +1,5 @@
+> 凍結した記録（2026-11-14）。元は `create-intent-skill/shared-policy.md` にあった。行は足さない。これからの理由は PR の本文とコミットに書く。中の相対リンクは元の置き場からのもので、ここからは切れている。元の置き場で読むには、[移す前の版](https://github.com/degwinthegreat/skills/blob/53681c2f3304818e96fd73ab5e6e1ae1fbc91899/create-intent-skill/shared-policy.md)を開く。
+
 # 共有の方針
 
 このリポジトリのスキルに共通して効く方針。各スキルの `policy.md` から参照する。方針が変わったときは、このファイルだけを直す。
