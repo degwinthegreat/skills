@@ -94,6 +94,10 @@ AI に作業を渡すとき、人がやり方だけを渡して判断を持ち�
 
 v0 の試作で、まだ使っていません。create-intent-skill の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。記録を集計する道具が手元にあれば、`cognitive-surrender/local.md` に使い方を書けます。扱いは create-intent-skill の `local.md` と同じです。
 
+## 評価
+
+スキルの評価のケースを [evals/](evals/README.md) に置いています（`claude plugin eval` の形）。plugin で入れたときも、スキルの実行では読みません。
+
 ## agent-taxonomy との関係
 
 create-intent-skill は、参照先を [agent-taxonomy](https://agent-taxonomy.kawaida-dev.com) から探します。サイトの [llms.txt](https://agent-taxonomy.kawaida-dev.com/llms.txt) から参照先のスキルを選び、ルールの置き場所は [/principles の「Writing a skill」](https://agent-taxonomy.kawaida-dev.com/principles/#authoring)の手順で決めます。create-intent-skill の正本は、このリポジトリです。
