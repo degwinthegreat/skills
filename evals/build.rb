@@ -73,6 +73,9 @@ templates.each do |tmpl|
       next
     end
     (gf.keys - COMMON_GRADER_KEYS - GRADER_KEYS[gf["type"]]).each { |k| errors << "#{gname}: 知らないキー #{k}" }
+    if gf["type"] == "tool_used" && gf["tool"].to_s == "Skill"
+      errors << "#{gname}: tool_used: Skill は使わない（スラッシュの展開で呼ぶので Skill ツールは呼ばれない）"
+    end
     if gf["type"] == "regex"
       begin
         Regexp.new(gf["pattern"].to_s)
