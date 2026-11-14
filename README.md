@@ -13,7 +13,7 @@ Claude Code などのエージェントで使うスキルを置くリポジト�
 /plugin install kstack@kstack
 ```
 
-1つの plugin（`kstack`）に、intent-skill、cognitive-surrender、write-agent-rules、intent-spec が入っています。plugin のスキルには plugin の名前が付くので、`/kstack:intent-skill`、`/kstack:cognitive-surrender`、`/kstack:write-agent-rules`、`/kstack:intent-spec` で呼びます。
+1つの plugin（`kstack`）に、intent-skill、cognitive-surrender、write-agent-rules、intent-spec、create-frontier-team が入っています。plugin のスキルには plugin の名前が付くので、`/kstack:intent-skill`、`/kstack:cognitive-surrender`、`/kstack:write-agent-rules`、`/kstack:intent-spec`、`/kstack:create-frontier-team` で呼びます。
 
 ### npx skills
 
@@ -22,9 +22,10 @@ npx skills add degwinthegreat/skills --skill intent-skill
 npx skills add degwinthegreat/skills --skill cognitive-surrender
 npx skills add degwinthegreat/skills --skill write-agent-rules
 npx skills add degwinthegreat/skills --skill intent-spec
+npx skills add degwinthegreat/skills --skill create-frontier-team
 ```
 
-どれも1つだけで動きます。こちらは `/intent-skill`、`/cognitive-surrender`、`/write-agent-rules`、`/intent-spec` で呼びます。
+どれも1つだけで動きます。こちらは `/intent-skill`、`/cognitive-surrender`、`/write-agent-rules`、`/intent-spec`、`/create-frontier-team` で呼びます。
 
 ### 手で置く
 
@@ -37,8 +38,9 @@ ln -s "$(pwd)/skills/intent-skill" ~/.claude/skills/intent-skill
 ln -s "$(pwd)/skills/cognitive-surrender" ~/.claude/skills/cognitive-surrender
 ln -s "$(pwd)/skills/write-agent-rules" ~/.claude/skills/write-agent-rules
 ln -s "$(pwd)/skills/intent-spec" ~/.claude/skills/intent-spec
+ln -s "$(pwd)/skills/create-frontier-team" ~/.claude/skills/create-frontier-team
 # またはコピー
-cp -R skills/intent-skill skills/cognitive-surrender skills/write-agent-rules skills/intent-spec ~/.claude/skills/
+cp -R skills/intent-skill skills/cognitive-surrender skills/write-agent-rules skills/intent-spec skills/create-frontier-team ~/.claude/skills/
 ```
 
 plugin と手で置いたものの両方があると、両方が読み込まれます。どちらか1つにしてください。
@@ -83,6 +85,18 @@ anthropic の product-management の write-spec との違い：write-spec は、
 
 - [SKILL.md](intent-spec/SKILL.md)：冒頭の仕様（ユースケース、成功の定義、避けたい失敗）と進め方
 - 評価のケース：[evals/](evals/README.md) の `spec-` で始まる3本
+
+v0 の試作で、まだ使っていません。intent-skill の「作る」の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。ほかのスキルのファイルを読まないので、1つだけでも入れられます。
+
+## create-frontier-team
+
+チームを frontier team（AI エージェントに合わせて開発の進め方を作り直したチーム）に仕上げるための、流れを設計するスキルです。要求・原則 → 仕様 → チケット → 計画 → 実行 → PR → 検証 → 評価 の段ごとに、誰が・どのスキルを・どの種類のセッション（計画か実行か）で・どのツールの上で使うかを決めます。上流（方針・仕様・規約）のスキルは決める役の人だけが持ち、タスクの実行は、依頼を書く計画のセッションと、1チケットに1つの実行のセッションに分けます。ノードには種類（分ける・実行・コード・関門）を付け、関門は間違えたときの戻しにくさで分け、戻り道を直しの辺と学びの辺の2本にし、人は1か所に置きます。人に聞くのは、役割と人数、使っているツール、対象のリポジトリだけです。
+
+出力は、ノードと矢印のキャンバスです。スキルは設計を JSON にまとめ、同梱の `canvas.html`（外のファイルやネットワークを使わない1ファイル。パン・ズーム、ノードをクリックで詳細）に埋め込んで書き出します。描画は HTML がするので、呼ぶたびに形が変わりません。表、チケットの雛形、足りないもの（スキルや検証・評価の無い段、戻り道や関門の抜け）も、同じ JSON から HTML のタブに出ます。ツールはロゴを使わず、名前と色のバッジで表します。
+
+- [SKILL.md](create-frontier-team/SKILL.md)：冒頭の仕様（作るきっかけ、ユースケース、成功の定義、避けたい失敗）、判断の材料、進め方
+- [canvas.html](create-frontier-team/canvas.html)：決まった描画
+- 評価のケース：[evals/](evals/README.md) の `frontier-` で始まる2本
 
 v0 の試作で、まだ使っていません。intent-skill の「作る」の手順で作りました。人が名前で呼ぶスキルです（`disable-model-invocation: true`）。ほかのスキルのファイルを読まないので、1つだけでも入れられます。
 
