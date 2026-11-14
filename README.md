@@ -39,10 +39,6 @@ cp -R skills/intent-skill skills/cognitive-surrender ~/.claude/skills/
 
 plugin と手で置いたものの両方があると、両方が読み込まれます。どちらか1つにしてください。
 
-### 前の名前
-
-create-intent-skill、improve-intent-skill、redesign-intent-workflow は、intent-skill にまとめました。前の名前で呼ぶと、intent-skill を使うよう案内だけが出ます。この案内は次の版で消します。
-
 ## intent-skill
 
 スキルは、エージェントが良い選択をするための薄い材料にし、ルールは実例か人の決定があるものだけにする、という向きでスキルを扱います。1つのスキルに3つの節があります。

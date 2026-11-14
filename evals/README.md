@@ -18,7 +18,7 @@ kstack のスキルの評価のケース。`claude plugin eval` の形（ケー�
 
 ## スキルの名前
 
-ケースは、スキルを名前で呼ぶ（どれも `disable-model-invocation: true` なので、名前で呼ばないと動かない）。名前は [names.env](names.env) の1か所に書き、各ケースの `prompt.tmpl.md` の `{{SKILL_CREATE}}` などを置き換えて `prompt.md` を作る。`claude plugin eval` には、ケースをまたいで値を共有する仕組みが無いため。
+ケースは、スキルを名前で呼ぶ（どれも `disable-model-invocation: true` なので、名前で呼ばないと動かない）。名前は [names.env](names.env) の1か所に書き、各ケースの `prompt.tmpl.md` の `{{SKILL_INTENT}}` などを置き換えて `prompt.md` を作る。`claude plugin eval` には、ケースをまたいで値を共有する仕組みが無いため。
 
 ```sh
 ruby evals/build.rb          # names.env か prompt.tmpl.md を直したら、prompt.md を作り直す
