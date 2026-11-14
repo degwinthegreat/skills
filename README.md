@@ -94,6 +94,10 @@ v0 の試作で、まだ使っていません。intent-skill の「作る」の�
 
 出力は、ノードと矢印のキャンバスです。スキルは設計を JSON にまとめ、同梱の `canvas.html`（外のファイルやネットワークを使わない1ファイル。パン・ズーム、ノードをクリックで詳細）に埋め込んで書き出します。描画は HTML がするので、呼ぶたびに形が変わりません。表、チケットの雛形、足りないもの（スキルや検証・評価の無い段、戻り道や関門の抜け）も、同じ JSON から HTML のタブに出ます。ツールはロゴを使わず、名前と色のバッジで表します。
 
+架空の4人のチームで1回出した例です。
+
+![create-frontier-team の出力の例](docs/images/create-frontier-team/canvas.png)
+
 - [SKILL.md](create-frontier-team/SKILL.md)：冒頭の仕様（作るきっかけ、ユースケース、成功の定義、避けたい失敗）、判断の材料、進め方
 - [canvas.html](create-frontier-team/canvas.html)：決まった描画
 - 評価のケース：[evals/](evals/README.md) の `frontier-` で始まる2本
