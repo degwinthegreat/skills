@@ -5,4 +5,4 @@ max_turns: 15
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 
-/{{SKILL_CREATE}} 汎用のコードレビューのスキルを作って。
+/{{SKILL_INTENT}} 汎用のコードレビューのスキルを作って。

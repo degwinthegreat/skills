@@ -5,7 +5,7 @@ max_turns: 15
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 
-/{{SKILL_CREATE}} コミットのメッセージを書くスキルを作りたい。
+/{{SKILL_INTENT}} コミットのメッセージを書くスキルを作りたい。
 
 方針は、次の内容で私が OK した。
 

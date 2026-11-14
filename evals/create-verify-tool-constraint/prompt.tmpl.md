@@ -5,7 +5,7 @@ max_turns: 15
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 
-/{{SKILL_CREATE}} プルリクエストの本文に、画面の変化のスクリーンショットを添えるスキルを作りたい。
+/{{SKILL_INTENT}} プルリクエストの本文に、画面の変化のスクリーンショットを添えるスキルを作りたい。
 
 方針は、次の内容で私が OK した。
 

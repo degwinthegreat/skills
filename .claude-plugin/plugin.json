@@ -1,15 +1,13 @@
 {
   "name": "kstack",
-  "description": "create-intent-skill、improve-intent-skill、redesign-intent-workflow、cognitive-surrender、write-agent-rules。意思（解決したいこと）に沿ってスキルを作り、使って起きた失敗の記録から直し、複数のスキルにまたがる組み立てを設計し直し、人が明け渡していた所を見つけ、エージェントが読むチームの規約を薄い材料と実例のあるルールで書く",
+  "description": "intent-skill、cognitive-surrender、write-agent-rules。意思（解決したいこと）に沿ってスキルを作り、起きた失敗を評価のケースにして直し、複数のスキルにまたがる組み立てを見直す。人が明け渡していた所を見つける。エージェントが読むチームの規約を、薄い材料と実例のあるルールで書く",
   "author": {
     "name": "degwinthegreat"
   },
   "repository": "https://github.com/degwinthegreat/skills",
   "license": "MIT",
   "skills": [
-    "./create-intent-skill",
-    "./improve-intent-skill",
-    "./redesign-intent-workflow",
+    "./intent-skill",
     "./cognitive-surrender",
     "./write-agent-rules"
   ]

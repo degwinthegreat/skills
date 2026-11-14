@@ -5,7 +5,7 @@ max_turns: 15
 allowed_tools: [Read, Glob, Grep, Skill]
 ---
 
-/{{SKILL_IMPROVE}} 下のスキル、なんか改善が必要だと思う。
+/{{SKILL_INTENT}} 下のスキル、なんか改善が必要だと思う。
 
 ```markdown
 ---
