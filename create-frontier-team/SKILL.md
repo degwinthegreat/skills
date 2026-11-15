@@ -29,7 +29,7 @@ frontier team は、AI エージェントに合わせて開発の進め方を作
 - 設計書（md、上流。決める役の人が持つ）：目的（なぜこの流れか）、役割、原則、範囲の外（やらないこと）、成功の定義（はい・いいえで判定できる形）、未決の問い（誰が答えるか）、更新のときは変えてはいけないもの。語は intent-spec が書く仕様書と揃え、新しい語を作らない。
 - 仕様書（JSON、実行の側が読む）：進め方の3の形。図はここから毎回作り、手で直さない。置き場はリポジトリの決まりに従い、無ければ `docs/frontier-team/` の `design.md`・`spec.json`・`flow.html`。
 - ゼロから作る：進め方を1から順に。チームが決めていない値（目標の数値など）は、推測で埋めずに未決の問いに置く。
-- 更新する：今の設計書と仕様書を読み、依頼の変更だけを、足す・変える・消す・名前を変えるの差分として書いてから本文に入れる。消すものには理由を書く。依頼に無い直しは、仕様書に入れずに案として返す。
+- 更新する：今の設計書と仕様書を読み、依頼の変更だけを、足す・変える・消す・名前を変えるの差分として書いてから本文に入れる。消すものには理由を書く。依頼に無い直しは、仕様書に入れずに案として返す。version 1 の仕様書は、依頼が新しいキー（short・actor・checks・phases など）を要るときだけ version 2 にする。要らなければ、上げる案として返す。
 
 ## 判断の材料
 
@@ -47,26 +47,38 @@ frontier team は、AI エージェントに合わせて開発の進め方を作
 
 1. 読む：リポジトリの決まり（CLAUDE.md、AGENTS.md など）、入っているスキル（リポジトリ、`~/.claude/skills`、plugin）、CI と評価の置き場。
 2. 聞く：チームの役割と人数、使っているツール（原則・仕様・チケット・コードの置き場）、対象のリポジトリのうち、1で分からなかったものだけを一度に聞き、答えを待つ。段、スキル、セッションの分け方、図の形は聞かずに決める。
-3. 仕様書を JSON にする。形はここだけで決める（`version` は形を変えたら上げる。キーは省略してよく、欠けたものは HTML が足りないものとして描く）。
+3. 仕様書を JSON にする。形はここだけで決める（`version` は形を変えたら上げる。今は 2。キーは省略してよく、欠けたものは HTML が足りないものとして描く。version 1 の仕様書もそのまま描ける）。
 
    ```json
-   {"version":1,"team":"名前","repo":"owner/repo",
-    "roles":[{"id":"po","name":"プロダクトオーナー","people":1,"decides":true}],
+   {"version":2,"team":"名前","repo":"owner/repo",
+    "roles":[{"id":"po","name":"プロダクトオーナー","actor":"human | agent | auto","people":1,"decides":true}],
     "tools":[{"id":"linear","name":"Linear","color":"#5e6ad2"}],
     "stages":[{"id":"intent","name":"要求・原則"}],
-    "nodes":[{"id":"n1","stage":"intent","role":"po","title":"方針を書く","skills":["…"],
+    "phases":[{"id":"asis","name":"今"},{"id":"tobe","name":"目指す形"}],
+    "nodes":[{"id":"n1","stage":"intent","role":"po","title":"方針を書く","short":"方針","skills":["…"],
               "session":"plan | run | human","layer":"upstream | task","kind":"split | work | code | gate",
               "risk":"narrow | wide | irreversible（関門だけ）","human":true,"check":"判定",
-              "tools":["notion"],"output":"方針のページ","gap":"スキルが無いときの理由"}],
-    "edges":[{"from":"n1","to":"n2","kind":"data | fix | learn","label":"方針のページ"}],
+              "checks":[{"id":"test","title":"テスト","session":"run | human（省くと自動）","check":"判定","skills":[],"tools":[],"gap":""}],
+              "tools":["notion"],"output":"方針のページ","gap":"スキルが無いときの理由","since":"asis","until":"tobe"}],
+    "edges":[{"from":"n1","to":"n2","kind":"data | fix | learn","label":"方針のページ","since":"tobe"}],
     "ticket_template":"チケットの雛形（Markdown）"}
    ```
 
-   コードと、スクリプトや CI が通す関門は `session` を省く（図では「自動」）。スキルが無い段は `skills` を空にして `gap` に書く。無いスキルの名前を作らない。ツールはロゴを使わず、名前と色で表す。
+   - カードに出るのは `short`（10 文字前後の名詞。無ければ `title` から括弧を除いたもの）と印だけで、`title` の全文・判定・成果物は選んだときの詳細に出る。`title` は文でよい。
+   - 役割の `actor` は行の性質：人（`people` は人数）、エージェント、自動（スクリプト・CI）。人でない行に `people` を書かない。
+   - コードと、スクリプトや CI が通す関門は `session` を省く（図では「自動」）。スキルが無い段は `skills` を空にして `gap` に書く。無いスキルの名前を作らない。ツールはロゴを使わず、名前と色で表す。
+   - 関門の中の検査（自動テスト・lint・評価・人の確認など）は `checks` に並べる。キーはノードと同じで、`check` は関門を通す条件、各検査の `check` はその検査の判定。足りない検査は `gap` に書く。
+   - 今の流れ（as-is）と移行の段階があるときだけ `phases` を順に書き、ノードと辺に `since`（その段階から在る）・`until`（その段階から無い）を付ける。どちらも無いものは、すべての段階に在る。図は段階を切り替えて出し、既定は最後の段階。足りないものは選んだ段階で数える。
 4. 書き出す：設計書と仕様書を書き、この SKILL.md と同じフォルダの `canvas.html` は読まずに、次で仕様書を埋め込んだ図を作る（`</` を `<\/` に変えて `/*DESIGN*/null` を置き換える）。書き込めなければ、設計書と仕様書を返答に出す。
 
    ```sh
    python3 -c 'import sys;h=open(sys.argv[1]).read();d=open(sys.argv[2]).read().replace("</","<\\/");open(sys.argv[3],"w").write(h.replace("/*DESIGN*/null",d,1))' <canvas.html> <spec.json> <flow.html>
+   ```
+
+   ほかの道具が同じ図に注記を重ねるときは、同じやり方で `/*OVERLAY*/null` を次の JSON に置き換える。対象の ID は、ノードは `id`、辺は `id` か無ければ `from>to:kind`（重なれば出てきた順に `#2`）、検査は `ノードのid/検査のid`（無ければ 1 から数えた番号）。このスキルは注記を書かない。
+
+   ```json
+   {"version":1,"source":"道具の名前","title":"何の注記か","marks":[{"target":"node:n7 | edge:n7>n6:fix | check:n7/test","level":"info | warn | error | muted","label":"短い印","text":"詳しく"}]}
    ```
 
 5. 確かめる：開ける道具があれば HTML を開き、「足りないもの」のタブを見る（学びの辺が無い、人を置く関門が1か所でない、などを HTML が数える）。開けなければ、同じ点を JSON で数え直す。
