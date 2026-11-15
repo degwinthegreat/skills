@@ -44,35 +44,43 @@
  "stages": [
   {
    "id": "intent",
-   "name": "要求・原則"
+   "name": "要求・原則",
+   "group": "input"
   },
   {
    "id": "spec",
-   "name": "仕様"
+   "name": "仕様",
+   "group": "input"
   },
   {
    "id": "rules",
-   "name": "規約・設計"
+   "name": "規約・設計",
+   "group": "input"
   },
   {
    "id": "split",
-   "name": "分ける"
+   "name": "分ける",
+   "group": "routing"
   },
   {
    "id": "run",
-   "name": "実行"
+   "name": "実行",
+   "group": "candidate"
   },
   {
    "id": "verify",
-   "name": "検証"
+   "name": "検証",
+   "group": "candidate"
   },
   {
    "id": "merge",
-   "name": "マージ"
+   "name": "マージ",
+   "group": "output"
   },
   {
    "id": "eval",
-   "name": "評価"
+   "name": "評価",
+   "group": "output"
   }
  ],
  "nodes": [
@@ -307,6 +315,10 @@
    "skills": [],
    "session": "human",
    "human": true,
+   "human_if": {
+    "text": "移行・データの削除・決済を含む差分のとき。ほかは必須のチェックが緑なら自動でマージする",
+    "since": "step2"
+   },
    "kind": "gate",
    "risk": "irreversible",
    "layer": "task",
@@ -612,6 +624,19 @@
   {
    "id": "tobe",
    "name": "目指す形"
+  }
+ ],
+ "triggers": [
+  {
+   "to": "n2",
+   "by": "human",
+   "role": "po",
+   "label": "機能の依頼"
+  },
+  {
+   "to": "n10",
+   "by": "schedule",
+   "label": "毎週"
   }
  ]
 }
