@@ -59,7 +59,7 @@ frontier team は、AI エージェントに合わせて開発の進め方を作
     "triggers":[{"to":"n2","by":"human | schedule | event","role":"po","label":"機能の依頼"}],
     "nodes":[{"id":"n1","stage":"intent","role":"po","title":"方針を書く","short":"方針","skills":["…"],
               "session":"plan | run | human","layer":"upstream | task","kind":"split | work | code | gate",
-              "risk":"narrow | wide | irreversible（関門だけ）","human":true,"human_if":"条件の文 | {\"text\":\"条件の文\",\"since\":\"step2\"}","check":"判定",
+              "risk":"narrow | wide | irreversible（関門だけ）","human":true,"human_if":"条件の文 | {\"text\":\"条件の文\",\"since\":\"tobe\"}","check":"判定",
               "checks":[{"id":"test","title":"テスト","session":"run | human（省くと自動）","check":"判定","skills":[],"tools":[],"gap":"","since":"asis","until":"tobe"}],
               "tools":["notion"],"output":"方針のページ","gap":"足りない理由 | {\"text\":\"足りない理由\",\"since\":\"asis\",\"until\":\"tobe\"}","since":"asis","until":"tobe"}],
     "edges":[{"from":"n1","to":"n2","kind":"data | fix | learn","label":"方針のページ","since":"tobe"}],

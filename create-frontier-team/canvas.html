@@ -1034,7 +1034,7 @@
     const sec = document.getElementById("table");
     sec.append(el("h2", null, team + " の流れ：役割 × 段 × スキル × セッション × ツール"));
     const t = el("table"), hr = el("tr");
-    ["段", "役割", "ノード", "関わり", "種類", "スキル", "ツール", "成果物", "判定"].concat(phases.length ? ["段階"] : [], marks.length ? ["注記"] : []).forEach((x) => hr.append(el("th", null, x)));
+    ["段", "役割", "ノード", "関わり", "セッション", "種類", "スキル", "ツール", "成果物", "判定"].concat(phases.length ? ["段階"] : [], marks.length ? ["注記"] : []).forEach((x) => hr.append(el("th", null, x)));
     t.append(hr);
     nodes.slice().sort((a, b) => stageIx.get(a.stage) - stageIx.get(b.stage) || roleIx.get(a.role) - roleIx.get(b.role)).forEach((n) => {
       const tr = el("tr"); tr.dataset.nodeId = n.id;
@@ -1051,6 +1051,7 @@
       }
       const conds = n.conds.map((c) => "条件：" + c.text + (phases.length && (c.since || c.until) ? "（" + span(c) + "）" : "")).join("／");
       td(invSpan(n) + (conds ? "。" + conds : ""));
+      td(SESSION[n.session] || (n.auto ? "自動" : "不明"));
       td((KIND[n.kind] || "—") + (n.kind === "gate" ? "・" + (RISK[n.risk] || "戻しにくさ不明") : ""));
       const sk = td(); if (n.skills.length) n.skills.forEach((s, i) => { if (i) sk.append("、"); sk.append(el("code", null, s)); }); else sk.append(n.wantsSkill ? "無し（足りない）" : "—");
       td(n.tools.map((x) => toolName.get(x) || x).join("、") || "—"); td(n.output || "—"); td(n.check || "—");

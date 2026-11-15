@@ -31,6 +31,7 @@ const overlayText = readFileSync(join(HERE, "soramame-overlay.json"), "utf8");
 const soraCur = JSON.parse(soramameText); soraCur.phases[1].current = true; // 段階1 を「今」にした版
 const PAGES = {
   sora: embed(soramameText, overlayText, "soramame.html"),
+  soraPlain: embed(soramameText, null, "soramame-plain.html"),
   soraCur: embed(JSON.stringify(soraCur), null, "soramame-current.html"),
   v1: embed(readFileSync(join(HERE, "v1.json"), "utf8"), null, "v1.html"),
   broken: embed(readFileSync(join(HERE, "broken.json"), "utf8"), "{not json", "broken.html"),
@@ -234,6 +235,8 @@ try {
   await go("a&table");
   check("表：図に無い対象の注記", (await js(`document.getElementById("table").textContent`)).includes("node:n99（図に無い対象）"));
   eq("表：ノードの行", await js(`document.querySelectorAll("#table tr[data-node-id]").length`), 13);
+  eq("表：役割 × 段 × スキル × セッション × ツールの列", await js(`[...document.querySelectorAll("#table table:first-of-type th")].map((t) => t.textContent).filter((t) => ["段", "役割", "スキル", "セッション", "ツール"].includes(t))`), ["段", "役割", "セッション", "スキル", "ツール"]);
+  eq("表：セッションの中身", await js(`[...document.querySelectorAll("#table tr[data-node-id]")].map((r) => r.children[4].textContent).slice(0, 5)`), ["計画", "計画", "計画", "計画", "自動"]);
   check("表：表の中にチケットの雛形が無い", !(await js(`document.getElementById("table").textContent.includes("雛形")`)));
 
   // ==== 詳細の窓が、選んだカード・戻り道・戻り先・見出しの帯を隠さない ====
@@ -345,6 +348,7 @@ try {
 
   // ==== 画面を撮る ====
   if (SHOTS) {
+    await viewport(1440, 900); await open(PAGES.soraPlain); await shot("readme-a"); // README の画像（注記なし）
     for (const [w, h] of [[1440, 900], [1280, 800]]) {
       await viewport(w, h); await open(PAGES.sora); const sz = w + "x" + h;
       for (const [name, hash] of [["a", "a"], ["a-sel-n9", "a&sel=n9"], ["b", "b"], ["b-sel-n8h", "b&sel=n8h&g=g0"], ["b-sel-n9", "b&sel=n9"],
