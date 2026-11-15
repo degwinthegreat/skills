@@ -453,15 +453,18 @@
   });
 
   // ---- 主な道（a）：最初の段から最後の段までの、データの線の最長の道 ----
+  // データの線は戻り道ではないので、同じ段の中の矢印（worktree に配る → 実装 など）も道に入れる。輪にならないよう、たどっている途中のノードへは戻らない。
   const mainPathAt = (p) => {
     const alive = (n) => aliveAt(n, p);
-    const outE = groupBy(edges.filter((e) => e.kind === "data" && fwd(e) && aliveAt(e, p) && alive(byId.get(e.from)) && alive(byId.get(e.to))), (e) => e.from);
-    const lastSt = stages[stages.length - 1].id, memo = new Map();
+    const outE = groupBy(edges.filter((e) => e.kind === "data" && (fwd(e) || sameStage(e)) && aliveAt(e, p) && alive(byId.get(e.from)) && alive(byId.get(e.to))), (e) => e.from);
+    const lastSt = stages[stages.length - 1].id, memo = new Map(), onPath = new Set();
     const lg = (id) => {
       if (memo.has(id)) return memo.get(id);
+      onPath.add(id);
       let best = null;
-      for (const e of outE.get(id) || []) { const r = lg(e.to); if (r && (!best || r.length + 1 > best.length)) best = [e, ...r]; }
+      for (const e of outE.get(id) || []) { if (onPath.has(e.to)) continue; const r = lg(e.to); if (r && (!best || r.length + 1 > best.length)) best = [e, ...r]; }
       if (!best && byId.get(id).stage === lastSt) best = [];
+      onPath.delete(id);
       memo.set(id, best); return best;
     };
     let mp = [];
@@ -706,7 +709,7 @@
       n.ring.style.display = sel ? "" : "none";
       n.g.setAttribute("aria-expanded", String(S.sel === n.id && !tip.hidden));
       n.g.style.opacity = n.muted && view !== "c" ? 0.5 : "";
-      n.badge.style.display = "none"; n.dots.style.display = "none"; n.sub.textContent = ""; n.tl.textContent = "";
+      n.badge.style.display = "none"; n.dots.style.display = "none"; n.sub.textContent = ""; n.sub.removeAttribute("textLength"); n.sub.removeAttribute("lengthAdjust"); n.tl.textContent = "";
       n.marksG.style.display = view === "c" || gh ? "none" : "";
       let label = [n.card, INVL[inv], "段 " + (stageIx.get(n.stage) + 1) + "「" + stName(n.stage) + "」", roName(n.role)];
       if (gh) {
@@ -754,7 +757,9 @@
           label.push("条件：" + cond);
         } else if (n.skills.length) {
           n.sub.setAttribute("fill", SUB); n.sub.setAttribute("font-weight", 400); n.sub.setAttribute("font-family", MONO);
-          fitText(n.sub, n.skills[0], n.skills.length > 1 ? " +" + (n.skills.length - 1) : "");
+          // スキル名は、どこで何が動くかを示すので切らない。収まらなければ字の幅を詰めて枠の中に収める
+          n.sub.textContent = n.skills[0] + (n.skills.length > 1 ? " +" + (n.skills.length - 1) : "");
+          if (n.sub.getComputedTextLength() > room) { n.sub.setAttribute("textLength", room); n.sub.setAttribute("lengthAdjust", "spacingAndGlyphs"); }
         }
         // b：関門の中の検査の点（右上。灰＝自動・エージェント、人の色＝人、足りない検査は 1 位なら赤、ほかは濃い灰の白抜き）
         if (view === "b" && n.kind === "gate") {

@@ -143,6 +143,9 @@ try {
   check("a にきっかけ 2 つ", (await js(`document.querySelector("[data-layer=top]").textContent`)).includes("プロダクトオーナーが渡す：機能の依頼") && (await js(`document.querySelector("[data-layer=top]").textContent`)).includes("定期：毎週"));
   check("a にフェーズの行", ["入力", "振り分け", "候補", "出力"].every((g) => true) && (await js(`["入力","振り分け","候補","出力"].every((g) => [...document.querySelectorAll("[data-layer=dyn] text")].some((t) => t.textContent === g))`)));
   check("a の条件で人のカードに条件の文", (await js(`document.querySelector("[data-node-id=n9]").textContent`)).includes("移行・削除"));
+  eq("a の主な道（データの線の最長の道。同じ段の中の矢印も入れる）", await js(`[...document.querySelectorAll("[data-layer=main] g[data-edge-id]")].filter(__vis).map((g) => g.dataset.edgeId)`).then((l) => l.sort()),
+    ["n1>n2:data", "n2>n4:data", "n4>n5:data", "n5>n6:data", "n6>n7:data", "n7>n8:data", "n8>n9:data", "n9>dc:data", "dc>n10:data", "n10>n11:data"].sort());
+  check("a の主な道は濃い線", await js(`[...document.querySelectorAll("[data-layer=main] g[data-edge-id] path")].filter(__vis).every((x) => x.getAttribute("stroke") === "#6e665b")`));
   check("赤を a で使わない", !(await js(`document.getElementById("v").innerHTML.toLowerCase().includes("#c23a22")`)));
 
   // 属性
@@ -167,6 +170,7 @@ try {
     const m = await js(`Math.min(...__cards().map((g) => __fs(g.querySelector("text:nth-of-type(2)"))))`);
     check(`カードの名前が 14px 以上（1440×900 #${h}）`, m >= 14, m.toFixed(2) + "px");
     eq(`カードの字が枠に収まる（#${h}）`, await js(spill), []);
+    eq(`スキル名を切らない（#${h}）`, await js(`__cards().map((g) => [...g.querySelectorAll("text")].find((t) => t.getAttribute("font-family") && t.getAttribute("font-family").includes("Mono"))).filter((t) => t && __vis(t) && t.textContent.includes("…")).map((t) => t.closest(".card").dataset.nodeId)`), []);
   }
 
   // ブラウザの中の高さは 800px ほどになることが多い（設計書の「作って分かったこと」）。1440×800 でも見る
