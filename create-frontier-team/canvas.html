@@ -67,6 +67,10 @@
   .ph b { font-size: 13px; display: block; }
   .ph .n { display: block; color: #857f76; font-size: 11.5px; }
   .ph small { display: block; color: #5d5850; }
+  .ph ul { list-style: none; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid #ece7df; }
+  .ph li { margin: 0 0 4px; color: #3d3b38; }
+  .ph li b { display: inline; font-size: 12px; margin-right: 4px; }
+  .g small { display: block; color: #857f76; font-size: 11.5px; margin-top: 2px; }
   .d { background: #fff; border: 1px solid #e6e1d8; border-radius: 8px; padding: 7px 10px; margin-bottom: 6px; }
   .d b { display: inline-block; min-width: 6.6em; font-size: 12px; }
   .d span { color: #3d3b38; }
@@ -74,13 +78,16 @@
   /* 詳細の窓（popover。モーダルにしない） */
   #tip { position: fixed; width: 350px; padding: 12px 14px; font-size: 12px; line-height: 1.65; background: #fff; border: 1px solid #e3ded5; border-radius: 10px; box-shadow: 0 2px 8px rgba(90,74,48,.10); z-index: 6; }
   #tip[hidden] { display: none; }
-  #tip h2 { font-size: 14px; margin: 0 26px 6px 0; }
+  #tip h2 { font-size: 14px; margin: 0 26px 0 0; }
+  #tip .full { color: #857f76; margin: 0 26px 6px 0; }
   #tip .x { position: absolute; right: 8px; top: 6px; border: 0; background: none; font-size: 16px; color: #857f76; cursor: pointer; padding: 0 4px; }
   #tip .r > span:first-child { display: inline-block; width: 6.4em; color: #857f76; vertical-align: top; }
   #tip.dock { column-width: 250px; column-gap: 24px; font-size: 11.5px; line-height: 1.55; padding: 10px 14px; overflow: auto; box-shadow: none; }
   #tip.dock h2 { column-span: all; }
   #tip.dock .r, #tip.dock li { break-inside: avoid; }
   #tip ul { list-style: none; padding: 0; margin: 4px 0 0; }
+  #tip ul.lines { display: inline-block; margin: 0; width: calc(100% - 6.4em); }
+  #tip ul.lines li { padding-left: 0; margin: 0 0 2px; }
   #tip li { margin: 0 0 6px; padding-left: 14px; position: relative; }
   #tip li i { position: absolute; left: 0; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: #b8b0a3; }
   #tip li i.hum { background: #b0713f; }
@@ -93,7 +100,8 @@
   #tip li[aria-current="true"] { background: #f6f3ee; border-radius: 4px; }
 
   /* 表（見方とは別の、全文を読む・探す・印刷する所） */
-  #table { position: fixed; inset: 0; overflow: auto; padding: 64px 28px 28px; background: #fbfaf7; font-size: 12.5px; line-height: 1.55; }
+  #table { position: absolute; top: 0; left: 0; right: 0; min-height: 100%; padding: 64px 28px 28px; background: #fbfaf7; font-size: 12.5px; line-height: 1.55; outline: none; }
+  body[data-table] #top { background: #fbfaf7; padding: 4px 0 4px 12px; border-radius: 6px; }
   #table[hidden] { display: none; }
   #table h2 { font-size: 15px; margin: 0 0 10px; color: #3d3b38; }
   #table h3 { font-size: 13px; margin: 22px 0 8px; color: #3d3b38; }
@@ -101,6 +109,7 @@
   #table th, #table td { border: 1px solid #e3ded5; padding: 6px 8px; text-align: left; vertical-align: top; }
   #table th { background: #f3f0eb; font-weight: 600; white-space: nowrap; }
   #table td:nth-child(-n+2) { white-space: nowrap; }
+  #table td small { display: block; color: #857f76; }
   #table code { font-family: "SF Mono", Menlo, monospace; font-size: 11.5px; }
   #table ol { margin: 4px 0 0; padding-left: 18px; color: #5d5850; }
   @media print { #top { display: none; } #table { position: static; padding: 0; } }
@@ -121,7 +130,7 @@
 <main id="wrap" role="tabpanel"></main>
 <aside id="panel" aria-label="一覧"></aside>
 <div id="tip" role="dialog" aria-modal="false" aria-labelledby="tipTitle" hidden></div>
-<section id="table" aria-label="表" hidden></section>
+<section id="table" aria-label="表" tabindex="0" hidden></section>
 <script>
 (() => {
   "use strict";
@@ -364,6 +373,18 @@
     const ed = edges.filter((e) => e.kind === "data" && now(e) !== was(e) && [e.from, e.to].every((id) => now(byId.get(id)) && was(byId.get(id)))).map((e) => ({ e, added: now(e) }));
     return { add, rem, rep, chg, edges: ed };
   };
+  // b の 1 位のカードが、今の段階より後で無くなる・置き換わるなら、そう言う（決まったこと 7。重さの順は変えない）
+  const phShort = (i) => phases[i].name.split("：")[0].trim() || phases[i].name;
+  const laterOf = (o) => {
+    if (!phases.length) return "";
+    for (const id of o.nodes) {
+      const n = byId.get(id), u = n.until ? phaseIx.get(n.until) : -1;
+      if (u <= CUR) continue;
+      return phShort(u) + (diffAt(u).rep.some((r) => r.from.includes(id)) ? " で置き換える予定" : " で無くす予定");
+    }
+    return "";
+  };
+  const laterNote = (o) => { const t = laterOf(o); return t ? "（" + t + "）" : ""; };
   const changeOf = (df, id) => {
     if (df.add.includes(id)) return "足す";
     const r = df.rep.find((q) => q.to.includes(id) || q.from.includes(id));
@@ -529,6 +550,29 @@
     const k = soft >= cut * 0.3 ? soft : kind >= cut * 0.3 ? kind : cut;
     return k;
   };
+  // カードの名前は 17（1440×900 でどの見方でも 14px 以上）。1 行に収まらなければ 2 行にし、それでも収まらなければ … で切る。
+  // b・c で一覧のぶん図が小さくなり、名前が 14px を下回るとき（1280 幅など）だけ、名前の字を大きくして 14px 以上にする（見せ方 V1）。
+  const NAME = 17;
+  const setName = (n, fs) => {
+    if (n.fs === fs) return;
+    n.fs = fs; n.nm.setAttribute("font-size", fs);
+    if (!n.lineMemo.has(fs)) {
+      n.nm.replaceChildren(); n.nm.textContent = n.card;
+      let lines;
+      if (n.nm.getComputedTextLength() <= room) lines = [n.card];
+      else {
+        const s = n.card; let cut = 1;
+        for (let k = 1; k < s.length; k++) { n.nm.textContent = s.slice(0, k); if (n.nm.getComputedTextLength() <= room) cut = k; else break; }
+        cut = breakAt(s, cut);
+        n.nm.textContent = s.slice(cut).trim(); fitText(n.nm, s.slice(cut).trim());
+        lines = [s.slice(0, cut).trim(), n.nm.textContent];
+      }
+      n.lineMemo.set(fs, lines);
+    }
+    n.lines = n.lineMemo.get(fs);
+    const { x } = P.get(n.id);
+    n.nm.replaceChildren(); n.lines.forEach((ln) => { const t = sv("tspan", { x: x + 13 }, n.nm); t.textContent = ln; });
+  };
   nodes.forEach((n) => {
     const { x, y } = P.get(n.id);
     const g = sv("g", { class: "card", "data-node-id": n.id, role: "button", tabindex: -1, "aria-haspopup": "dialog", "aria-expanded": "false" }, lay.card);
@@ -539,6 +583,12 @@
     n.tl = tx(g, x + 13, y + 21, "", { "font-size": 10.5, "font-family": GOTH });
     n.nm = tx(g, x + 13, y + 48, "", { "font-size": 17, "font-weight": 700, fill: INK, "font-family": GOTH });
     n.sub = tx(g, x + 13, y + 68, "", { "font-size": 11, "font-family": GOTH });
+    // 関門の印（a）：カードの上の縁に載せる小さな札。右上の関わりの札と、上から入る矢印（左から 28）を避ける
+    if (n.kind === "gate") {
+      n.gateG = sv("g", { class: "gate" }, g);
+      sv("rect", { x: x + 38, y: y - 7.5, width: 44, height: 15, rx: 7.5, fill: "#fff", stroke: "#b8b0a3", "stroke-width": 0.9 }, n.gateG);
+      tx(n.gateG, x + 60, y + 3.6, "◆ 関門", { "font-size": 10, "font-weight": 600, fill: "#5d5850", "text-anchor": "middle", "font-family": GOTH });
+    }
     n.dots = sv("g", {}, g);
     n.checks.forEach((c, i) => { c.dot = sv("circle", { "data-check-id": c.key, cy: y + 17, r: 2.8 }, n.dots); });
     n.marksG = sv("g", {}, g);
@@ -551,23 +601,14 @@
     }
     n.muted = ms.length > 0 && ms.every((m) => m.level === "muted");
     n.g = g;
-    // カードの名前は 17（1440×900 でどの見方でも 14px 以上）。1 行に収まらなければ 2 行にし、それでも収まらなければ … で切る。
-    n.nm.textContent = n.card;
-    if (n.nm.getComputedTextLength() <= room) n.lines = [n.card];
-    else {
-      const s = n.card; let cut = 1;
-      for (let k = 1; k < s.length; k++) { n.nm.textContent = s.slice(0, k); if (n.nm.getComputedTextLength() <= room) cut = k; else break; }
-      cut = breakAt(s, cut);
-      n.nm.textContent = s.slice(cut).trim(); fitText(n.nm, s.slice(cut).trim());
-      n.lines = [s.slice(0, cut).trim(), n.nm.textContent];
-    }
-    n.nm.textContent = "";
-    n.lines.forEach((ln) => { const t = sv("tspan", { x: x + 13 }, n.nm); t.textContent = ln; });
+    n.lineMemo = new Map(); n.fs = 0;
+    setName(n, NAME);
   });
 
   // ---- 状態 ----
   const CUR = Math.max(0, phases.findIndex((ph) => ph.current));
   const S = { view: "a", p: NP - 1, sel: null, selList: null, ck: null, gap: null, table: false };
+  let nameFS = NAME;
   const effP = () => (S.view === "a" ? NP - 1 : S.view === "b" ? CUR : S.p);
   const VB = () => (S.view === "a" ? [0, W] : [32, W - 48]);
 
@@ -586,17 +627,18 @@
         ...uniq(HN.filter((n) => !(inAll && inSt.includes(n.stage))).map((n) => stName(n.stage))),
       ];
       const cst = uniq(Cn.map((n) => stName(n.stage)));
-      const h = stages[0].name + "から" + stages[stages.length - 1].name + "まで " + stages.length + " 段。" +
+      // どの段階の図かを見出しの頭で言う（a は最後の段階＝目指す形で判定する）
+      const h = (phases.length ? phName(p) + "：" : "") + stages[0].name + "から" + stages[stages.length - 1].name + "まで " + stages.length + " 段。" +
         (items.length ? "人がやるのは" + uniq(items).join("と") + (cst.length ? "、" + cst.join("・") + "は条件で人" : "") + "。" : cst.length ? "人は" + cst.join("・") + "で条件つきで関わる。" : "人は関わらない。");
       const cnt = (k) => ns.filter((n) => INV(n, p) === k).length;
-      return [h, [teamLine, phName(p), `カード ${ns.length} 枚：人 ${cnt("human")}・条件で人 ${cnt("cond")}・エージェント ${cnt("agent")}・自動 ${cnt("auto")}`].filter(Boolean).join("　")];
+      return [h, [teamLine, `カード ${ns.length} 枚：人 ${cnt("human")}・条件で人 ${cnt("cond")}・エージェント ${cnt("agent")}・自動 ${cnt("auto")}`].filter(Boolean).join("　")];
     }
     if (view === "b") {
       const at = phases.length ? "今の段階「" + phName(p) + "」で判定。" : "";
       const l = G.list;
       if (!l.length) return [(phases.length ? "今の段階「" + phName(p) + "」で" : "") + "足りないものは無い。", at + "　" + teamLine];
       const t = l[0], nm = t.nodes.length ? "「" + t.nodes.map(short).join("・") + "」" : gapWho(t);
-      return ["次に直すのは" + nm + "：" + t.text.split("。")[0] + (t.checkTitles.length > 1 ? "（" + t.checkTitles.join("・") + "）" : "") + "。",
+      return ["次に直すのは" + nm + laterNote(t) + "：" + t.text.split("。")[0] + (t.checkTitles.length > 1 ? "（" + t.checkTitles.join("・") + "）" : "") + "。",
         at + "足りないもの " + l.length + " 件（重さの順に右の一覧）　" + teamLine];
     }
     if (!phases.length) return ["移行の段階は書かれていない。", "仕様書に phases を書くと、今から目指す形までの段階をここで切り替えて見られる。　" + teamLine];
@@ -630,6 +672,12 @@
     document.getElementById("tableBtn").setAttribute("aria-pressed", String(S.table));
     document.querySelectorAll("#views [role=tab]").forEach((b) => { const on = b.dataset.v === view; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; });
     wrap.setAttribute("aria-labelledby", "tab-" + view);
+    renderFold();
+    // 図の倍率で名前が 14px を下回るなら、名前の字を大きくする（1280 幅の b・c。見せ方 V1）
+    if (!S.table) {
+      const wr = wrap.getBoundingClientRect(), sc = Math.min(wr.width / vw, wr.height / H);
+      nameFS = sc > 0 ? Math.min(21, Math.max(NAME, Math.ceil(14.05 / sc * 2) / 2)) : NAME;
+    }
 
     // 見出し
     const [h1, h2] = headline(view, p, G, df);
@@ -667,9 +715,10 @@
     if (view === "b") {
       groupBy(edges.filter((e) => e.kind !== "data" && liveE(e)), (e) => e.to).forEach((l, to) => {
         const b = P.get(to), kinds = uniq(l.map((e) => e.kind));
-        const t = kinds.map((k) => { const c = l.filter((e) => e.kind === k).length; return EDGE_KIND[k] + (c > 1 ? " " + c : ""); }).join("・");
+        // 数と分かる言い方にする（「直しで戻る 2 本」）
+        const t = kinds.map((k) => EDGE_KIND[k] + "で戻る " + l.filter((e) => e.kind === k).length + " 本").join("・");
         const maxBi = Math.max(...BACK.filter((e) => e.to === to).map((e) => e.bi));
-        tx(lay.dyn, b.x + TW - 14 - maxBi * 9 - 8, b.y + TH + 15, "戻る：" + t, { "font-size": 10.5, fill: "#7d7468", "text-anchor": "end", "font-family": GOTH });
+        tx(lay.dyn, b.x + TW - 14 - maxBi * 9 - 8, b.y + TH + 15, t, { "font-size": 10.5, fill: "#7d7468", "text-anchor": "end", "font-family": GOTH });
       });
     }
 
@@ -680,7 +729,11 @@
     const goneE = new Set(view === "c" ? df.edges.filter((x) => !x.added).map((x) => x.e.id) : []);
     edges.forEach((e) => {
       let show, col = "#bdb4a6", w = 1, dash = null, layer = lay.thin;
-      if (e.kind !== "data") {
+      if (e.kind !== "data" && view === "a") {
+        // a：直しの線は細く薄い破線で、いつも出す（データの線より軽く。学びの線は出さない。情報 I1）
+        show = e.kind === "fix" && liveE(e);
+        col = "#cdc5b8"; w = 0.8; dash = "3 3"; layer = lay.back;
+      } else if (e.kind !== "data") {
         show = view === "b" && liveE(e) && (selIds.has(e.from) || selIds.has(e.to));
         col = "#7d7468"; w = 1.1; dash = e.kind === "fix" ? "5 3" : "1.5 3"; layer = lay.back;
       } else if (goneE.has(e.id)) { show = true; col = "#a39a8c"; w = 1.2; dash = "2 3"; }
@@ -711,6 +764,7 @@
       n.g.style.opacity = n.muted && view !== "c" ? 0.5 : "";
       n.badge.style.display = "none"; n.dots.style.display = "none"; n.sub.textContent = ""; n.sub.removeAttribute("textLength"); n.sub.removeAttribute("lengthAdjust"); n.tl.textContent = "";
       n.marksG.style.display = view === "c" || gh ? "none" : "";
+      if (n.gateG) n.gateG.style.display = view === "a" && !gh ? "" : "none";
       let label = [n.card, INVL[inv], "段 " + (stageIx.get(n.stage) + 1) + "「" + stName(n.stage) + "」", roName(n.role)];
       if (gh) {
         n.frame.setAttribute("fill", "none"); n.frame.setAttribute("stroke", "#b8b0a3"); n.frame.setAttribute("stroke-width", 1); n.frame.setAttribute("stroke-dasharray", "3 3"); n.frame.removeAttribute("filter");
@@ -736,7 +790,8 @@
           n.badgeT.setAttribute("x", lx + lw / 2); n.badgeT.textContent = lb;
           n.badgeT.setAttribute("fill", hu || cd ? HUMTX : au ? "#958e83" : AGTX); n.badgeT.setAttribute("font-weight", au ? 400 : 600);
         }
-        // 左上：b は関門の戻しにくさ、c は段階での変化
+        // 左上：a は関門の印、b は関門の戻しにくさ、c は段階での変化
+        if (view === "a" && n.kind === "gate") label.push("関門");
         if (view === "b" && n.kind === "gate") {
           n.tl.textContent = RISKS[n.risk] || "戻しにくさ？"; n.tl.setAttribute("fill", n.risk === "irreversible" ? INK : SUB); n.tl.setAttribute("font-weight", n.risk === "irreversible" ? 700 : 400);
         }
@@ -776,10 +831,11 @@
         }
       }
       // 名前の位置（1 行か 2 行か、下の 1 行があるか）
-      const hasSub = !!n.sub.textContent, two = n.lines.length > 1;
-      const ys = two ? (hasSub ? [42, 61] : [46, 65]) : [hasSub ? 48 : 52];
+      setName(n, nameFS);
+      const hasSub = !!n.sub.textContent, two = n.lines.length > 1, lh = Math.round(nameFS * 1.12);
+      const ys = two ? (hasSub ? [40, 40 + lh] : [46, 46 + lh]) : [hasSub ? 48 : 52];
       [...n.nm.children].forEach((t, i) => t.setAttribute("y", y + ys[i]));
-      n.sub.setAttribute("y", y + (two ? 77 : 68));
+      n.sub.setAttribute("y", y + (two ? 75 : 68)); // 2 行のときも、下の端の注記の札（y + 77 から）に重ねない
       n.g.setAttribute("aria-label", label.join("、"));
     });
     const vis = nodes.filter((n) => n.shown);
@@ -789,13 +845,12 @@
 
     renderPanel(G, df);
     renderTip();
-    renderFold();
   };
 
   // ---- 横の一覧（b・c）：listbox ----
   const panel = document.getElementById("panel");
   const fold = el("button", null, "一覧をたたむ"); fold.id = "fold"; fold.type = "button"; fold.setAttribute("aria-controls", "panel");
-  fold.addEventListener("click", () => { document.body.toggleAttribute("data-fold"); renderFold(); placeTip(); });
+  fold.addEventListener("click", () => { document.body.toggleAttribute("data-fold"); render(); });
   const listbox = (label, id) => { const lb = el("div"); lb.setAttribute("role", "listbox"); lb.setAttribute("aria-label", label); lb.id = id; return lb; };
   const option = (cls, key, selected, onPick) => {
     const o = el("div", cls); o.setAttribute("role", "option"); o.dataset.key = key; o.setAttribute("aria-selected", String(!!selected)); o.tabIndex = -1;
@@ -817,7 +872,9 @@
         if (o.tier !== last) { grp = el("div"); grp.setAttribute("role", "group"); const t = el("div", "tier", TIER[o.tier]); t.id = "tier" + o.tier; grp.setAttribute("aria-labelledby", t.id); grp.append(t); lb.append(grp); last = o.tier; }
         const op = option("g" + (i === 0 ? " first" : ""), o.key, S.gap === o.key, () => { S.gap = o.key; S.selList = o.nodes.slice(); S.sel = o.nodes[0] || null; S.ck = o.checks.length ? o.checks.slice() : null; sync(); });
         op.append(el("b", null, gapWho(o)), el("span", null, gapText(o)));
-        op.setAttribute("aria-label", (i === 0 ? "次に直す。" : "") + gapWho(o) + "：" + gapText(o));
+        const later = i === 0 ? laterOf(o) : "";
+        if (later) op.append(el("small", null, later));
+        op.setAttribute("aria-label", (i === 0 ? "次に直す。" : "") + gapWho(o) + "：" + gapText(o) + (later ? "。" + later : ""));
         grp.append(op);
       });
       if (!G.list.length) panel.append(el("p", "sub", "足りないものは無い。"));
@@ -828,8 +885,16 @@
       const lb = listbox("段階", "phaseList");
       phases.forEach((ph, i) => {
         const op = option("ph", ph.id, i === p, () => { S.p = i; S.sel = null; S.selList = null; S.ck = null; sync(); });
-        op.append(el("b", null, ph.name + (i === CUR && phases.some((x) => x.current) ? "（今）" : "")), el("span", "n", "足りない " + gapsAt(i).list.length));
+        const gl = gapsAt(i).list;
+        op.append(el("b", null, ph.name + (i === CUR && phases.some((x) => x.current) ? "（今）" : "")), el("span", "n", "足りない " + gl.length));
         if (ph.note) op.append(el("small", null, ph.note));
+        // 選んだ段階には、残る足りないものの中身を出す（同じ理由は 1 行。並びは b と同じ重さの順。問い c3）
+        if (i === p && gl.length) {
+          const ul = el("ul"); ul.setAttribute("aria-label", ph.name + "に残る足りないもの");
+          gl.forEach((o) => { const li = el("li"); li.append(el("b", null, gapWho(o)), document.createTextNode(gapText(o))); ul.append(li); });
+          op.append(ul);
+          op.setAttribute("aria-label", ph.name + "、足りない " + gl.length + "：" + gl.map((o) => gapWho(o) + "：" + gapText(o)).join("。"));
+        }
         lb.append(op);
       });
       rove(lb); panel.append(lb);
@@ -879,10 +944,14 @@
     const view = S.view, p = effP(), G = gapsAt(p), first = G.list.length ? G.list[0] : null;
     const liveE = edges.filter((e) => aliveAt(e, p) && aliveAt(byId.get(e.from), p) && aliveAt(byId.get(e.to), p));
     tip.replaceChildren();
-    const h = el("h2", null, n.title); h.id = "tipTitle";
+    // 題はカードと同じ短い名前。題名の全文が違えば、その下に添える（図と表を照らし合わせられるように）
+    const h = el("h2", null, n.card); h.id = "tipTitle";
     const x = el("button", "x", "×"); x.type = "button"; x.setAttribute("aria-label", "詳細を閉じる"); x.addEventListener("click", () => closeTip(true));
     tip.append(h, x);
+    if (n.title !== n.card) tip.append(el("div", "full", n.title)); else h.style.marginBottom = "6px";
     const row = (k, v) => { if (v == null || v === "") return; const d = el("div", "r"); d.append(el("span", null, k), typeof v === "string" ? document.createTextNode(v) : v); tip.append(d); };
+    // 2 つ以上あるものは「／」でつながず、1 行ずつ
+    const lines = (list) => { if (!list.length) return ""; if (list.length === 1) return list[0]; const ul = el("ul", "lines"); list.forEach((t) => ul.append(el("li", null, t))); return ul; };
     const inv = INV(n, aliveAt(n, p) ? p : p - 1);
     const invText = { human: "人がやる" + (n.layer === "upstream" && n.session !== "human" ? "（エージェントが下書き）" : ""), cond: "条件で人：" + condAt(n, p), agent: "エージェント（" + (n.session === "plan" ? "計画" : "実行") + "のセッション）", auto: "自動（コード・CI）" }[inv];
     const tag = (e) => (e.label ? "（" + e.label + "）" : "") + mk("edge:" + e.id).map((m) => " " + markLine(m)).join("");
@@ -891,6 +960,10 @@
       row("関わり", invText); row("スキル", n.skills.join("、") || "—"); row("成果物", n.output || "—");
       row("受け取る", liveE.filter((e) => e.kind === "data" && e.to === id).map((e) => short(e.from) + tag(e)).join("、") || "—");
       row("渡す", liveE.filter((e) => e.kind === "data" && e.from === id).map((e) => short(e.to) + tag(e)).join("、") || "—");
+      // 関門と直しの線（a3：どこで判定し、通らなければどこへ戻すか）
+      if (n.kind === "gate") row("判定", n.check || "—");
+      row("通らなければ", lines(liveE.filter((e) => e.kind === "fix" && e.from === id).map((e) => short(e.to) + "へ戻す" + tag(e))));
+      row("直しで戻る", lines(liveE.filter((e) => e.kind === "fix" && e.to === id).map((e) => short(e.from) + "から" + tag(e))));
       nodeMarks();
     }
     if (view === "b") {
@@ -898,7 +971,7 @@
       if (n.kind === "gate") row("戻しにくさ", RISK[n.risk] || "書かれていない");
       row("判定", n.check || "—"); row("スキル", n.skills.join("、") || "—");
       const g = G.list.filter((o) => o.nodes.includes(id) && !(o.checks.length && o.tier === 4));
-      if (g.length) row("足りない", g.map((o) => (o === first ? "【次に直す】" : "") + o.text).join("／"));
+      if (g.length) row("足りない", lines(g.map((o) => (o === first ? "【次に直す】" : "") + o.text + (o === first ? laterNote(o) : ""))));
       const cks = n.checks.filter((c) => aliveAt(c, p));
       if (cks.length) {
         const ul = el("ul");
@@ -914,7 +987,7 @@
         row("中の検査", ul);
       }
       const back = liveE.filter((e) => e.kind !== "data" && (e.from === id || e.to === id)).map((e) => EDGE_KIND[e.kind] + "：" + short(e.from) + " → " + short(e.to) + tag(e));
-      row("戻り道", back.join("／") || "—");
+      row("戻り道", lines(back) || "—");
       nodeMarks();
     }
     if (view === "c") {
@@ -939,11 +1012,13 @@
       tip.classList.remove("dock"); tip.style.width = "";
     }
     const near = new Set([id, ...(S.selList || [])]);
-    edges.forEach((e) => { if (aliveAt(e, p) && (e.kind === "data" || view === "b") && (e.from === id || e.to === id)) { near.add(e.from); near.add(e.to); } });
+    const routeOf = (e) => view === "b" || (view === "a" && e.kind === "fix");
+    edges.forEach((e) => { if (aliveAt(e, p) && (e.kind === "data" || routeOf(e)) && (e.from === id || e.to === id)) { near.add(e.from); near.add(e.to); } });
     const box = (g) => { const r = g.getBoundingClientRect(); return { l: r.left - 6, t: r.top - 6, r: r.right + 6, b: r.bottom + 6 }; };
     const cards = nodes.filter((n) => n.shown).map((n) => ({ id: n.id, r: box(n.g) }));
     const guard = cards.filter((c) => near.has(c.id)).map((c) => c.r);
     if (view === "b") edges.filter((e) => e.g.classList.contains("route")).forEach((e) => guard.push(box(e.g)));
+    if (view === "a") edges.filter((e) => e.g.classList.contains("route") && (e.from === id || e.to === id)).forEach((e) => guard.push(box(e.g)));
     guard.push({ l: wr.left, t: wr.top, r: wr.right, b: wr.top + (TOP + 4) * sc });
     const tw = tip.offsetWidth, th = tip.offsetHeight;
     const ov = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
@@ -1016,7 +1091,8 @@
 
   // ---- 見方の切り替え：tablist（← → で隣へ移って切り替え、Home・End で端へ） ----
   const tabs = [...document.querySelectorAll("#views [role=tab]")];
-  const setView = (v) => { figStop = null; S.view = v; S.sel = null; S.selList = null; S.ck = null; S.gap = null; S.table = false; if (v !== "c") S.p = NP - 1; sync(); };
+  // c で選んだ段階は、ほかの見方へ移っても残す（hash の p=。a・b の判定には使わない）
+  const setView = (v) => { figStop = null; S.view = v; S.sel = null; S.selList = null; S.ck = null; S.gap = null; S.table = false; sync(); };
   tabs.forEach((b, i) => {
     b.addEventListener("click", () => setView(b.dataset.v));
     b.addEventListener("keydown", (ev) => {
@@ -1025,7 +1101,7 @@
       ev.preventDefault(); const t = tabs[(j + tabs.length) % tabs.length]; setView(t.dataset.v); t.focus();
     });
   });
-  document.getElementById("tableBtn").addEventListener("click", () => { S.table = !S.table; S.sel = null; S.selList = null; S.ck = null; S.gap = null; sync(); });
+  document.getElementById("tableBtn").addEventListener("click", () => { S.table = !S.table; S.sel = null; S.selList = null; S.ck = null; S.gap = null; sync(); scrollTo(0, 0); });
 
   // ---- 表（全文を読む・探す・印刷する所。段階に関係なく全部を並べる） ----
   const span = (o) => phases.length && (o.since || o.until) ? (o.since ? phases[phaseIx.get(o.since)].name : phases[0].name) + " から" + (o.until ? "（" + phases[phaseIx.get(o.until)].name + " で無くなる）" : "") : "すべての段階";
@@ -1045,7 +1121,7 @@
       const tr = el("tr"); tr.dataset.nodeId = n.id;
       const td = (...c) => { const d = el("td"); c.forEach((x) => d.append(typeof x === "string" ? document.createTextNode(x) : x)); tr.append(d); return d; };
       td(stName(n.stage)); td(roName(n.role));
-      const nc = td(n.title);
+      const nc = td(el("b", null, n.card)); if (n.title !== n.card) nc.append(el("small", null, n.title));
       if (n.checks.length) {
         const ol = el("ol");
         n.checks.forEach((c) => {
@@ -1070,7 +1146,7 @@
     if (ed.length) {
       sec.append(el("h3", null, "戻り道（直し・学び）"));
       const t2 = el("table"), h2 = el("tr"); ["種類", "から", "へ", "渡すもの"].concat(phases.length ? ["段階"] : []).forEach((x) => h2.append(el("th", null, x))); t2.append(h2);
-      ed.forEach((e) => { const tr = el("tr"); tr.dataset.edgeId = e.id; [EDGE_KIND[e.kind], byId.get(e.from).title, byId.get(e.to).title, e.label + mk("edge:" + e.id).map((m) => " " + markLine(m)).join("")].concat(phases.length ? [span(e)] : []).forEach((x) => tr.append(el("td", null, x))); t2.append(tr); });
+      ed.forEach((e) => { const tr = el("tr"); tr.dataset.edgeId = e.id; [EDGE_KIND[e.kind], short(e.from), short(e.to), e.label + mk("edge:" + e.id).map((m) => " " + markLine(m)).join("")].concat(phases.length ? [span(e)] : []).forEach((x) => tr.append(el("td", null, x))); t2.append(tr); });
       sec.append(t2);
     }
     const lost = marks.filter((m) => !m.found);
@@ -1097,7 +1173,7 @@
   };
   const sync = () => {
     const q = [S.view];
-    if (S.view === "c" && S.p !== NP - 1 && phases.length) q.push("p=" + encodeURIComponent(phases[S.p].id));
+    if (S.p !== NP - 1 && phases.length) q.push("p=" + encodeURIComponent(phases[S.p].id));
     if (S.sel) q.push("sel=" + encodeURIComponent(S.sel));
     if (S.gap) q.push("g=" + S.gap);
     if (S.table) q.push("table");
@@ -1106,7 +1182,7 @@
     render();
   };
   addEventListener("hashchange", () => { parse(); render(); });
-  addEventListener("resize", () => { renderFold(); placeTip(); });
+  addEventListener("resize", () => { render(); });
   parse();
   render();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => placeTip());

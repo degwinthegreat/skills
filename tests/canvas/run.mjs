@@ -95,7 +95,7 @@ const js = async (expr) => {
   if (r.exceptionDetails) throw new Error("評価で失敗：" + (r.exceptionDetails.exception?.description || r.exceptionDetails.text) + "\n" + expr.slice(0, 200));
   return r.result.value;
 };
-const KEYS = { Tab: 9, Enter: 13, Escape: 27, " ": 32, End: 35, Home: 36, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40 };
+const KEYS = { Tab: 9, Enter: 13, Escape: 27, " ": 32, PageDown: 34, End: 35, Home: 36, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40 };
 const press = async (key, shift = false) => {
   const base = { key, code: key === " " ? "Space" : key, windowsVirtualKeyCode: KEYS[key], nativeVirtualKeyCode: KEYS[key], modifiers: shift ? 8 : 0 };
   await send("Input.dispatchKeyEvent", Object.assign({ type: "rawKeyDown" }, base));
@@ -136,10 +136,27 @@ try {
   check("チケットの雛形が無い", !(await js(`document.body.innerText.includes("雛形") || document.body.innerHTML.includes("## ゴール")`)));
   eq("画面の枠の要素（見方 3・表 1）", await js(`[...document.querySelectorAll("#top button")].filter(__vis).map((b) => b.textContent)`), ["全体を掴む", "次に直す", "移行", "表"]);
   check("凡例が無い", !(await js(`/凡例|legend/i.test(document.body.innerHTML.replace(/<script[\\s\\S]*?<\\/script>/g, ""))`)));
-  eq("見出し a", await headline(), "要求・原則から評価まで 8 段。人がやるのは機能の依頼と入力の 3 段、マージは条件で人。");
+  eq("見出し a（頭にどの段階の図か）", await headline(), "目指す形：要求・原則から評価まで 8 段。人がやるのは機能の依頼と入力の 3 段、マージは条件で人。");
+  check("a の下の 1 行に段階の名前を重ねない", !(await js(`document.querySelector("[data-layer=bg] text:nth-of-type(2)").textContent`)).includes("目指す形"));
   eq("a のカードの札", await js(`__cards().map((g) => g.dataset.nodeId + ":" + [...g.querySelectorAll("text")].map((t) => t.textContent).filter((t) => ["人", "条件で人", "エージェント", "自動"].includes(t)).join())`),
     ["n1:人", "n2:人", "n3:人", "n4:エージェント", "n5:自動", "n6:エージェント", "n7:自動", "n8:エージェント", "n9:条件で人", "dc:自動", "n10:自動", "n11:エージェント"]);
-  check("a に戻り道の線が無い", (await js(`[...document.querySelectorAll("[data-layer=back] g")].filter(__vis).length`)) === 0);
+  // 情報 I1（2026-11-16）：a に関門の印と直しの線。直しの線は細く薄い破線で、データの線より軽い。学びの線は出さない
+  eq("a に直しの線（目指す形で生きているもの）", await js(`[...document.querySelectorAll("[data-layer=back] g")].filter(__vis).map((g) => g.dataset.edgeId).sort()`), ["dc>n4:fix", "n7>n4:fix", "n7>n6:fix", "n8>n6:fix", "n9>n6:fix"]);
+  eq("a に学びの線を出さない", await js(`[...document.querySelectorAll("g[data-edge-id]")].filter((g) => __vis(g) && g.dataset.edgeId.endsWith(":learn")).length`), 0);
+  check("a の直しの線は破線で、データの線より細く薄い", await js(`(() => {
+    const fx = [...document.querySelectorAll("[data-layer=back] g")].filter(__vis).map((g) => g.querySelector("path"));
+    const dt = [...document.querySelectorAll("[data-layer=thin] g")].filter(__vis).map((g) => g.querySelector("path"));
+    const lum = (c) => { const n = parseInt(c.slice(1), 16); return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255); };
+    return fx.length && dt.length && fx.every((p) => p.getAttribute("stroke-dasharray") && +p.getAttribute("stroke-width") < Math.min(...dt.map((d) => +d.getAttribute("stroke-width"))) && lum(p.getAttribute("stroke")) > Math.max(...dt.map((d) => lum(d.getAttribute("stroke")))));
+  })()`));
+  eq("a の関門に印", await js(`__cards().filter((g) => __vis(g.querySelector(".gate"))).map((g) => g.dataset.nodeId)`), ["n7", "n8", "n9"]);
+  // 印は、カードの中の字（関わりの札・名前）にも、上から入る矢印にも重ならない
+  eq("a の関門の印がほかの字と矢印に重ならない", await js(`(() => {
+    const box = (e) => e.getBoundingClientRect(), hit = (a, b) => Math.min(a.right, b.right) > Math.max(a.left, b.left) + 0.5 && Math.min(a.bottom, b.bottom) > Math.max(a.top, b.top) + 0.5;
+    const marks = __cards().map((g) => g.querySelector(".gate")).filter((m) => m && __vis(m));
+    const others = [...document.querySelectorAll(".card text, [data-layer=main] path, [data-layer=thin] path, [data-layer=top] text")].filter((t) => __vis(t) && !t.closest(".gate") && (t.textContent || t.tagName === "path"));
+    return marks.flatMap((m) => others.filter((o) => hit(box(m), box(o))).map((o) => m.closest(".card").dataset.nodeId + ":" + (o.textContent || o.parentNode.dataset.edgeId)));
+  })()`), []);
   check("a にきっかけ 2 つ", (await js(`document.querySelector("[data-layer=top]").textContent`)).includes("プロダクトオーナーが渡す：機能の依頼") && (await js(`document.querySelector("[data-layer=top]").textContent`)).includes("定期：毎週"));
   check("a にフェーズの行", ["入力", "振り分け", "候補", "出力"].every((g) => true) && (await js(`["入力","振り分け","候補","出力"].every((g) => [...document.querySelectorAll("[data-layer=dyn] text")].some((t) => t.textContent === g))`)));
   check("a の条件で人のカードに条件の文", (await js(`document.querySelector("[data-node-id=n9]").textContent`)).includes("移行・削除"));
@@ -184,25 +201,31 @@ try {
 
   // ==== 見方 b ====
   await go("b");
-  eq("見出し b", await headline(), "次に直すのは「人のレビュー」：レビューの観点が書かれていない。");
-  eq("b の一覧（重さの順）", await js(`[...document.querySelectorAll("#gapList [role=option]")].map((o) => o.textContent)`),
-    ["人のレビューレビューの観点が書かれていない", "人のレビュー流れの途中に人がいる（人を置くのは 1 か所に絞る）", "流れ全体学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", "人のレビュー段「検証」に、スキルの決まったノードが無い", "段「評価」段「評価」にノードが無い"]);
+  eq("見出し b（1 位がこの先で置き換わることを添える）", await headline(), "次に直すのは「人のレビュー」（段階1 で置き換える予定）：レビューの観点が書かれていない。");
+  eq("b の一覧（重さの順。1 位に置き換える予定）", await js(`[...document.querySelectorAll("#gapList [role=option]")].map((o) => o.textContent)`),
+    ["人のレビューレビューの観点が書かれていない段階1 で置き換える予定", "人のレビュー流れの途中に人がいる（人を置くのは 1 か所に絞る）", "流れ全体学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", "人のレビュー段「検証」に、スキルの決まったノードが無い", "段「評価」段「評価」にノードが無い"]);
   eq("b の重さの段", await js(`[...document.querySelectorAll("#gapList [role=group]")].map((g) => document.getElementById(g.getAttribute("aria-labelledby")).textContent)`), ["戻しにくさ", "人の関門と戻り道", "スキル", "書き漏れ"]);
   check("b は今の段階で判定（見出しの下と一覧）", (await js(`document.getElementById("v").textContent`)).includes("今の段階「今」で判定") && (await js(`document.getElementById("panel").textContent`)).includes("今の段階「今」で判定"));
   eq("赤は 1 位のカードだけ", await js(`[...document.querySelectorAll(".card")].filter((g) => __vis(g) && g.innerHTML.toLowerCase().includes("#c23a22")).map((g) => g.dataset.nodeId)`), ["n8h"]);
   eq("b の既定では戻り道の線を出さない", await js(`[...document.querySelectorAll("[data-layer=back] g")].filter(__vis).length`), 0);
-  check("b の戻り先に「戻る」の文字", (await js(`document.querySelector("[data-layer=dyn]").textContent`)).includes("戻る：直し 2"));
+  check("b の戻り先に、数と分かる「直しで戻る 2 本」", (await js(`document.querySelector("[data-layer=dyn]").textContent`)).includes("直しで戻る 2 本"));
   check("b に段階の切り替えが無い", !(await js(`!!document.getElementById("phaseList")`)));
   // 一覧で選ぶ → 図のカードが選ばれ、戻り道が出る
   await js(`document.querySelector("#gapList [role=option]").click(); true`);
   eq("一覧で選ぶとカードが選ばれる", await js(`[...document.querySelectorAll(".card[aria-expanded=true]")].map((g) => g.dataset.nodeId)`), ["n8h"]);
   eq("選んだカードの戻り道だけ出る", await js(`[...document.querySelectorAll("[data-layer=back] g")].filter(__vis).map((g) => g.dataset.edgeId)`), ["n8h>n6:fix"]);
   eq("一覧の選びに aria-selected", await js(`document.querySelector("#gapList [aria-selected=true]").dataset.key`), "g0");
+  // 詳細の窓：題は短い名前、その下に題名。足りないものと戻り道は「／」でつながず 1 行ずつ
+  eq("窓の題は短い名前、下に題名", await js(`[document.getElementById("tipTitle").textContent, document.querySelector("#tip .full").textContent]`), ["人のレビュー", "テックリードがすべての PR を読む"]);
+  eq("窓の足りないものは 1 行ずつ", await js(`[...document.querySelectorAll("#tip .r")].find((r) => r.firstChild.textContent === "足りない").querySelectorAll("li").length`), 3);
+  check("窓の足りないものを「／」でつながない", !(await js(`[...document.querySelectorAll("#tip .r")].find((r) => r.firstChild.textContent === "足りない").textContent`)).includes("／"));
+  check("窓の 1 位に置き換える予定", (await js(`document.getElementById("tip").textContent`)).includes("【次に直す】レビューの観点が書かれていない（段階1 で置き換える予定）"));
   // 段階1 を「今」にした版：同じ理由（CI がまだ無い）は 1 行にまとまり、検査を選ぶと関門の中の検査が示される
   await open(PAGES.soraCur + "#b"); await js(HELP);
   const curList = await js(`[...document.querySelectorAll("#gapList [role=option]")].map((o) => o.textContent)`);
   eq("段階1 が今：件数", curList.length, 3);
   check("段階1 が今：1 位は学びの辺", curList[0].includes("学びの辺が無い"), curList[0]);
+  check("段階1 が今：1 位がこの先で消えないなら「予定」を書かない", !(await headline()).includes("予定") && !curList[0].includes("予定"), await headline());
   check("段階1 が今：CI の 3 行が 1 行に", curList.filter((t) => t.includes("CI がまだ無い")).length === 1 && curList.some((t) => t.includes("CI がまだ無い（テスト・型・lint）")), JSON.stringify(curList));
   await js(`[...document.querySelectorAll("#gapList [role=option]")].find((o) => o.textContent.includes("CI")).click(); true`);
   eq("検査の足りないものを選ぶと関門の中の検査を示す", await js(`[...document.querySelectorAll("#tip li[aria-current=true]")].map((l) => l.dataset.checkId)`), ["n7/test", "n7/type", "n7/lint"]);
@@ -224,6 +247,21 @@ try {
   check("c：段階の理由（note）", (await js(`document.getElementById("panel").textContent`)).includes("ノードは変えない。検査を CI に載せ"));
   check("c：段階1 で跡（段階2 では出さない）", await js(`!__vis(document.querySelector("[data-node-id=n8h]"))`));
   eq("c：段階ごとの足りないものの数", await js(`[...document.querySelectorAll("#phaseList .n")].map((x) => x.textContent)`), ["足りない 5", "足りない 3", "足りない 3", "足りない 1"]);
+  // 問い c3：選んだ段階の足りないものを、中身まで（b と同じまとめ方。同じ理由は 1 行）
+  const cGaps = {};
+  for (const p of ["asis", "step1", "step2", "tobe"]) { await go("c&p=" + p); cGaps[p] = await js(`[...document.querySelectorAll("#phaseList [aria-selected=true] li")].map((l) => l.textContent)`); }
+  eq("c：段階1 の足りないものの中身", cGaps.step1, ["流れ全体学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", "決定的な検査CI がまだ無い（テスト・型・lint）", "段「評価」段「評価」にノードが無い"]);
+  eq("c：中身の行の数は足りないものの数と同じ", [cGaps.asis.length, cGaps.step1.length, cGaps.step2.length, cGaps.tobe.length], [5, 3, 3, 1]);
+  eq("c：選んでいない段階には中身を出さない", await js(`[...document.querySelectorAll("#phaseList [aria-selected=false] li")].length`), 0);
+  check("c：一覧に赤を使わない", !(await js(`[...document.querySelectorAll("#panel *")].some((e) => /rgb\(194, 58, 34\)/.test(getComputedStyle(e).color + getComputedStyle(e).borderColor))`)));
+  // c で選んだ段階は、ほかの見方へ移っても残る（hash の p=）
+  await go("c&p=step1");
+  await js(`document.getElementById("tab-b").click(); true`);
+  check("c の段階が b へ移っても hash に残る", (await js(`location.hash`)).includes("p=step1"), await js(`location.hash`));
+  eq("b の判定は今の段階のまま", await headline(), "次に直すのは「人のレビュー」（段階1 で置き換える予定）：レビューの観点が書かれていない。");
+  await js(`document.getElementById("tab-a").click(); true`);
+  await js(`document.getElementById("tab-c").click(); true`);
+  eq("c へ戻ると選んだ段階のまま", [await js(`location.hash`), await js(`document.querySelector("#phaseList [aria-selected=true]").dataset.key`)], ["#c&p=step1", "step1"]);
   await go("c");
   check("c：線が無くなった跡", await js(`(() => { const g = document.querySelector('[data-edge-id="n4>n6:data"]'); return __vis(g) && g.querySelector("path").getAttribute("stroke-dasharray") === "2 3"; })()`));
 
@@ -235,8 +273,23 @@ try {
   check("注記：b で線に札（選んだ戻り道）", await js(`[...document.querySelectorAll('[data-layer=top] [data-edge-id="n9>n6:fix"]')].some(__vis)`));
   check("注記：検査の注記は詳細の中の検査に", (await js(`document.querySelector('#tip li[data-check-id="n9/risk"]').textContent`)).includes("見落とし 1"));
   await go("c");
+  eq("関門の印は c に出さない", await js(`[...document.querySelectorAll(".gate")].filter(__vis).length`), 0);
+  await go("b"); eq("関門の印は b に出さない（b は左上に戻しにくさ）", await js(`[...document.querySelectorAll(".gate")].filter(__vis).length`), 0);
+  await go("c");
   check("注記：c では出さない", !(await js(`[...document.querySelectorAll("[data-node-id=n9] text")].some((t) => __vis(t) && t.textContent.includes("✎"))`)));
   await go("a&table");
+  // 表はページそのものがスクロールする（ホイール・PageDown・キー）。中の箱だけが動く形にしない
+  check("表：ページが表の長さまでスクロールできる", await js(`document.scrollingElement.scrollHeight > innerHeight + 200`), await js(`document.scrollingElement.scrollHeight + "/" + innerHeight`));
+  check("表：中の箱だけがスクロールする形でない", await js(`(() => { const t = document.getElementById("table"); return t.scrollHeight <= t.clientHeight + 1; })()`));
+  eq("表：キーボードで入れる", await js(`document.getElementById("table").tabIndex`), 0);
+  await js(`scrollTo(0, 0); document.getElementById("table").focus(); true`);
+  await press("PageDown"); await js(`new Promise((ok) => setTimeout(() => ok(true), 300))`);
+  check("表：PageDown でページが動く", (await js(`scrollY`)) > 100, String(await js(`scrollY`)));
+  await press("End"); await js(`new Promise((ok) => setTimeout(() => ok(true), 300))`);
+  check("表：End で終わりまで動く", (await js(`scrollY + innerHeight >= document.scrollingElement.scrollHeight - 2`)));
+  await js(`scrollTo(0, 0); true`);
+  eq("表：短い名前を先に、題名を下に", await js(`[...document.querySelector('#table tr[data-node-id="n8"]').children[2].children].slice(0, 2).map((x) => x.tagName + ":" + x.textContent)`), ["B:レビュー", "SMALL:規約と仕様のレビュー"]);
+  check("表：題名と短い名前が同じなら 1 つだけ", await js(`!document.querySelector('#table tr[data-node-id="n7"]').children[2].querySelector("small")`));
   check("表：図に無い対象の注記", (await js(`document.getElementById("table").textContent`)).includes("node:n99（図に無い対象）"));
   eq("表：ノードの行", await js(`document.querySelectorAll("#table tr[data-node-id]").length`), 13);
   eq("表：役割 × 段 × スキル × セッション × ツールの列", await js(`[...document.querySelectorAll("#table table:first-of-type th")].map((t) => t.textContent).filter((t) => ["段", "役割", "スキル", "セッション", "ツール"].includes(t))`), ["段", "役割", "セッション", "スキル", "ツール"]);
@@ -258,7 +311,7 @@ try {
           const guard = [document.querySelector('[data-node-id="' + sel + '"]')];
           [...document.querySelectorAll("g[data-edge-id]")].filter((g) => __vis(g) && g.querySelector("path")).forEach((g) => {
             const [f, rest] = g.dataset.edgeId.split(">"), to = rest.split(":")[0], kind = rest.split(":")[1].split("#")[0];
-            if ((f === sel || to === sel) && (kind === "data" || view === "b")) { guard.push(document.querySelector('[data-node-id="' + f + '"]'), document.querySelector('[data-node-id="' + to + '"]')); if (kind !== "data") guard.push(g); }
+            if ((f === sel || to === sel) && (kind === "data" || view === "b" || (view === "a" && kind === "fix"))) { guard.push(document.querySelector('[data-node-id="' + f + '"]'), document.querySelector('[data-node-id="' + to + '"]')); if (kind !== "data") guard.push(g); }
           });
           const over = guard.filter((g) => g && __vis(g) && hit(g.getBoundingClientRect())).map((g) => g.dataset.nodeId || g.dataset.edgeId);
           const head = document.querySelector("[data-stage-id]").getBoundingClientRect();
@@ -313,7 +366,7 @@ try {
   await press("ArrowDown"); eq("図で ↓ は近い行", (await active()).startsWith("card:"), true);
   await press("Enter"); const picked = await active();
   eq("Enter で選ぶ（フォーカスはカードに残る）", [await js(`document.querySelector(".card[aria-expanded=true]")?.dataset.nodeId`), await js(`!document.getElementById("tip").hidden`)], [picked.slice(5), true]);
-  eq("窓の題はカードの題名", await js(`document.getElementById(document.getElementById("tip").getAttribute("aria-labelledby")).textContent`), await js(`(() => { const n = ${JSON.stringify(JSON.parse(soramameText).nodes)}.find((x) => x.id === "${picked.slice(5)}"); return n.title; })()`));
+  eq("窓の題はカードの短い名前", await js(`document.getElementById(document.getElementById("tip").getAttribute("aria-labelledby")).textContent`), await js(`(() => { const n = ${JSON.stringify(JSON.parse(soramameText).nodes)}.find((x) => x.id === "${picked.slice(5)}"); return n.short || n.title; })()`));
   await press("Escape"); eq("Esc で選びを外す", [await js(`document.querySelectorAll(".card[aria-expanded=true]").length`), await active()], [0, picked]);
   // c：段階をキーボードで
   await js(`document.getElementById("tab-c").focus(); true`); await press("End");
@@ -332,7 +385,18 @@ try {
   check("1280 で一覧をたたむボタンが出る", await js(`__vis(document.getElementById("fold"))`));
   await js(`document.getElementById("fold").click(); true`);
   const after = await js(`Math.min(...__cards().map((g) => __fs(g.querySelector("text:nth-of-type(2)"))))`);
-  check("たたむとカードの名前が 14px 以上", before < 14 && after >= 14, before.toFixed(1) + " → " + after.toFixed(1));
+  check("1280 で一覧を出したままでも、カードの名前が 14px 以上（見せ方 V1）", before >= 14, before.toFixed(2) + "px");
+  check("たたんでもカードの名前が 14px 以上", after >= 14, after.toFixed(1));
+  await js(`document.getElementById("fold").click(); true`);
+  for (const h of ["b", "c&p=asis", "c&p=step1", "c&p=step2", "c"]) {
+    await go(h);
+    const m = await js(`Math.min(...__cards().map((g) => __fs(g.querySelector("text:nth-of-type(2)"))))`);
+    check(`カードの名前が 14px 以上（1280×800 #${h}）`, m >= 14, m.toFixed(2) + "px");
+    eq(`カードの字が枠に収まる（1280×800 #${h}）`, await js(spill), []);
+    eq(`スキル名を切らない（1280×800 #${h}）`, await js(`__cards().map((g) => [...g.querySelectorAll("text")].find((t) => t.getAttribute("font-family") && t.getAttribute("font-family").includes("Mono"))).filter((t) => t && __vis(t) && t.textContent.includes("…")).map((t) => t.closest(".card").dataset.nodeId)`), []);
+  }
+  await go("c&p=step1");
+  check("1280×800 の c：選んだ段階の足りないものが、一覧をスクロールせずに見える", await js(`(() => { const l = [...document.querySelectorAll("#phaseList [aria-selected=true] li")]; return l.length > 0 && l[l.length - 1].getBoundingClientRect().bottom <= innerHeight; })()`));
   await viewport(1440, 900); await open(PAGES.sora + "#b"); await js(HELP);
   check("1440 ではたたむボタンを出さない", !(await js(`__vis(document.getElementById("fold"))`)));
 
@@ -355,7 +419,7 @@ try {
     await viewport(1440, 900); await open(PAGES.soraPlain); await shot("readme-a"); // README の画像（注記なし）
     for (const [w, h] of [[1440, 900], [1280, 800]]) {
       await viewport(w, h); await open(PAGES.sora); const sz = w + "x" + h;
-      for (const [name, hash] of [["a", "a"], ["a-sel-n9", "a&sel=n9"], ["b", "b"], ["b-sel-n8h", "b&sel=n8h&g=g0"], ["b-sel-n9", "b&sel=n9"],
+      for (const [name, hash] of [["a", "a"], ["a-sel-n9", "a&sel=n9"], ["a-sel-n7", "a&sel=n7"], ["b", "b"], ["b-sel-n8h", "b&sel=n8h&g=g0"], ["b-sel-n9", "b&sel=n9"],
         ["c-asis", "c&p=asis"], ["c-step1", "c&p=step1"], ["c-step1-sel-n8", "c&p=step1&sel=n8"], ["c-step2", "c&p=step2"], ["c-tobe", "c"], ["table", "a&table"]]) {
         await go(hash); await shot(sz + "-" + name);
       }
