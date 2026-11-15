@@ -1,0 +1,617 @@
+{
+ "team": "そらまめ",
+ "repo": "soramame/yado",
+ "roles": [
+  {
+   "id": "po",
+   "name": "プロダクトオーナー",
+   "people": 1,
+   "decides": true,
+   "actor": "human"
+  },
+  {
+   "id": "tl",
+   "name": "テックリード",
+   "people": 1,
+   "decides": true,
+   "actor": "human"
+  },
+  {
+   "id": "eng",
+   "name": "エンジニア",
+   "people": 2,
+   "decides": false,
+   "actor": "human"
+  }
+ ],
+ "tools": [
+  {
+   "id": "notion",
+   "name": "Notion",
+   "color": "#37352f"
+  },
+  {
+   "id": "linear",
+   "name": "Linear",
+   "color": "#5e6ad2"
+  },
+  {
+   "id": "github",
+   "name": "GitHub",
+   "color": "#24292f"
+  }
+ ],
+ "stages": [
+  {
+   "id": "intent",
+   "name": "要求・原則"
+  },
+  {
+   "id": "spec",
+   "name": "仕様"
+  },
+  {
+   "id": "rules",
+   "name": "規約・設計"
+  },
+  {
+   "id": "split",
+   "name": "分ける"
+  },
+  {
+   "id": "run",
+   "name": "実行"
+  },
+  {
+   "id": "verify",
+   "name": "検証"
+  },
+  {
+   "id": "merge",
+   "name": "マージ"
+  },
+  {
+   "id": "eval",
+   "name": "評価"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "n1",
+   "stage": "intent",
+   "role": "po",
+   "title": "目的・やらないことを書く",
+   "skills": [
+    "intent-skill"
+   ],
+   "session": "plan",
+   "layer": "upstream",
+   "kind": "work",
+   "tools": [
+    "notion"
+   ],
+   "check": "目的・やらないこと・成功の定義の各欄が埋まっている",
+   "output": "原則のページ（Notion）",
+   "short": "原則"
+  },
+  {
+   "id": "n2",
+   "stage": "spec",
+   "role": "po",
+   "title": "機能の仕様を書く",
+   "skills": [
+    "intent-spec"
+   ],
+   "session": "plan",
+   "layer": "upstream",
+   "kind": "work",
+   "tools": [
+    "notion"
+   ],
+   "check": "各要件に、はい・いいえで判定できる受け入れ条件がある",
+   "output": "仕様書（Notion）",
+   "short": "機能の仕様"
+  },
+  {
+   "id": "n3",
+   "stage": "rules",
+   "role": "tl",
+   "title": "規約と設計を書く",
+   "skills": [
+    "write-agent-rules"
+   ],
+   "session": "plan",
+   "layer": "upstream",
+   "kind": "work",
+   "tools": [
+    "github"
+   ],
+   "check": "規約の各項目が検査（lint・テスト・差分の範囲）か、レビューで引ける行になっている",
+   "output": "AGENTS.md と設計メモ（GitHub）",
+   "short": "規約・設計"
+  },
+  {
+   "id": "n4",
+   "stage": "split",
+   "role": "eng",
+   "title": "チケットに分け、依頼を書く",
+   "skills": [
+    "to-tickets"
+   ],
+   "session": "plan",
+   "layer": "task",
+   "kind": "split",
+   "tools": [
+    "linear",
+    "notion"
+   ],
+   "check": "縦の切り口（使う人から見た機能1つ：検索・空室表示・予約・キャンセル）で分かれ、各チケットに完了の条件・止めているチケット・計画したファイルがある。止められていないものだけ依頼を書く",
+   "output": "Linear のチケットと、着手できるものの依頼文",
+   "short": "チケットに分ける"
+  },
+  {
+   "id": "n5",
+   "stage": "run",
+   "role": "eng",
+   "title": "着手できるチケットを worktree に配る",
+   "skills": [],
+   "kind": "code",
+   "layer": "task",
+   "tools": [
+    "linear",
+    "github"
+   ],
+   "check": "止めているチケットがすべて完了のものだけ配る（スクリプト）",
+   "output": "1チケット = 1 worktree と依頼文",
+   "short": "worktree に配る",
+   "since": "tobe"
+  },
+  {
+   "id": "n6",
+   "stage": "run",
+   "role": "eng",
+   "title": "実装する（作る → 判定 → 直す）",
+   "skills": [
+    "implement-spec",
+    "tdd"
+   ],
+   "session": "run",
+   "layer": "task",
+   "kind": "work",
+   "tools": [
+    "github"
+   ],
+   "check": "テストのコマンドが 0 で終わる／差分が計画したファイルだけ。1チケット・1観点・新しい文脈・専用の worktree で並列",
+   "output": "PR（GitHub）",
+   "short": "実装"
+  },
+  {
+   "id": "n7",
+   "stage": "verify",
+   "role": "eng",
+   "title": "決定的な検査",
+   "skills": [],
+   "kind": "gate",
+   "risk": "narrow",
+   "layer": "task",
+   "tools": [
+    "github"
+   ],
+   "check": "テスト・型・lint が 0 で終わる／差分がチケットの計画したファイルだけ",
+   "output": "検査を通った PR と検査の記録",
+   "short": "決定的な検査",
+   "checks": [
+    {
+     "id": "test",
+     "title": "テスト",
+     "check": "テストのコマンドが 0 で終わる",
+     "tools": [
+      "github"
+     ],
+     "gap": {
+      "text": "CI がまだ無い",
+      "until": "step2"
+     }
+    },
+    {
+     "id": "type",
+     "title": "型",
+     "check": "型検査が 0 で終わる",
+     "tools": [
+      "github"
+     ],
+     "gap": {
+      "text": "CI がまだ無い",
+      "until": "step2"
+     }
+    },
+    {
+     "id": "lint",
+     "title": "lint",
+     "check": "lint が 0 で終わる",
+     "tools": [
+      "github"
+     ],
+     "gap": {
+      "text": "CI がまだ無い",
+      "until": "step2"
+     }
+    },
+    {
+     "id": "scope",
+     "title": "差分の範囲",
+     "check": "差分がチケットの計画したファイルだけ（スクリプト）"
+    },
+    {
+     "id": "e2e",
+     "title": "予約の通しテスト",
+     "check": "予約の通しテストが 0 で終わる",
+     "tools": [
+      "github"
+     ],
+     "since": "step2",
+     "gap": {
+      "text": "テストデータの作り方が決まっていない",
+      "until": "tobe"
+     }
+    }
+   ],
+   "since": "step1"
+  },
+  {
+   "id": "n8",
+   "stage": "verify",
+   "role": "eng",
+   "title": "規約と仕様のレビュー",
+   "skills": [
+    "code-review"
+   ],
+   "session": "run",
+   "kind": "gate",
+   "risk": "wide",
+   "layer": "task",
+   "tools": [
+    "github",
+    "notion"
+   ],
+   "check": "指摘ごとに規約（AGENTS.md）か仕様書の行の出典がある／未解決の重大な指摘が 0。新しい文脈で、作ったセッションとは別に見る",
+   "output": "レビュー結果つきの PR",
+   "short": "レビュー",
+   "checks": [
+    {
+     "id": "rules",
+     "title": "規約のレビュー",
+     "session": "run",
+     "skills": [
+      "code-review"
+     ],
+     "check": "指摘ごとに AGENTS.md の行の出典がある"
+    },
+    {
+     "id": "spec",
+     "title": "仕様の受け入れ条件",
+     "session": "run",
+     "skills": [
+      "code-review"
+     ],
+     "check": "仕様書の受け入れ条件を1つずつ、はい・いいえで判定した表がある"
+    }
+   ],
+   "since": "step1"
+  },
+  {
+   "id": "n9",
+   "stage": "merge",
+   "role": "tl",
+   "title": "マージを決める",
+   "skills": [],
+   "session": "human",
+   "human": true,
+   "kind": "gate",
+   "risk": "irreversible",
+   "layer": "task",
+   "tools": [
+    "github"
+   ],
+   "check": "決定的な検査とレビューが通っている。移行・データの削除・決済を含む差分は点数に関係なく自動で通さない",
+   "output": "main へのマージと差し戻しの記録",
+   "short": "マージ",
+   "checks": [
+    {
+     "id": "green",
+     "title": "検査とレビューが通っている",
+     "check": "必須のチェックがすべて緑（GitHub のブランチ保護）",
+     "tools": [
+      "github"
+     ]
+    },
+    {
+     "id": "all",
+     "title": "すべての差分を読む",
+     "session": "human",
+     "check": "テックリードが差分をすべて読んで承認した",
+     "until": "step2"
+    },
+    {
+     "id": "risk",
+     "title": "戻せない変更の確認",
+     "session": "human",
+     "check": "移行・データの削除・決済を含む差分は、人が読んで決める"
+    }
+   ]
+  },
+  {
+   "id": "dc",
+   "stage": "merge",
+   "role": "tl",
+   "title": "デプロイのあとに本番を確かめる（落ちてもマージは止めない）",
+   "short": "デプロイの確認",
+   "skills": [],
+   "kind": "code",
+   "layer": "task",
+   "tools": [
+    "github"
+   ],
+   "check": "本番のスモークテストが 0 で終わる",
+   "output": "デプロイの確認の記録",
+   "since": "tobe"
+  },
+  {
+   "id": "n10",
+   "stage": "eval",
+   "role": "tl",
+   "title": "差し戻しと指標を集める",
+   "skills": [],
+   "kind": "code",
+   "layer": "task",
+   "tools": [
+    "github",
+    "linear",
+    "notion"
+   ],
+   "check": "スクリプトで集計する：段ごとの差し戻し率と理由、コミットの速さ・デプロイの頻度（GitHub）、解決までの時間（Linear）、開発者の満足度（Notion のページ）",
+   "output": "週ごとの集計",
+   "short": "指標を集める",
+   "since": "tobe"
+  },
+  {
+   "id": "n11",
+   "stage": "eval",
+   "role": "tl",
+   "title": "評価して学びを返す",
+   "skills": [],
+   "session": "plan",
+   "kind": "work",
+   "layer": "task",
+   "tools": [
+    "notion",
+    "linear"
+   ],
+   "check": "スキルの評価のケース（過去の差し戻しから作る）の通過率と、チームの4指標を前の週と比べる。最初の2週間は遅くなる前提で見る",
+   "output": "分け方・依頼文の直し、規約と仕様への提案",
+   "gap": "評価のスキルが無い。スキルの評価のケースも無いので、差し戻しの記録から作る",
+   "short": "評価・学び",
+   "since": "tobe"
+  },
+  {
+   "id": "n8h",
+   "stage": "verify",
+   "role": "tl",
+   "title": "テックリードがすべての PR を読む",
+   "short": "人のレビュー",
+   "skills": [],
+   "session": "human",
+   "layer": "task",
+   "kind": "gate",
+   "risk": "wide",
+   "check": "テックリードが承認した",
+   "tools": [
+    "github"
+   ],
+   "until": "step1",
+   "gap": "レビューの観点が書かれていない"
+  }
+ ],
+ "edges": [
+  {
+   "from": "n1",
+   "to": "n2",
+   "kind": "data",
+   "label": "原則のページ"
+  },
+  {
+   "from": "n2",
+   "to": "n4",
+   "kind": "data",
+   "label": "仕様書"
+  },
+  {
+   "from": "n3",
+   "to": "n4",
+   "kind": "data",
+   "label": "設計メモ"
+  },
+  {
+   "from": "n4",
+   "to": "n5",
+   "kind": "data",
+   "label": "チケットと依頼文"
+  },
+  {
+   "from": "n5",
+   "to": "n6",
+   "kind": "data",
+   "label": "依頼文と worktree"
+  },
+  {
+   "from": "n3",
+   "to": "n6",
+   "kind": "data",
+   "label": "AGENTS.md"
+  },
+  {
+   "from": "n6",
+   "to": "n7",
+   "kind": "data",
+   "label": "PR"
+  },
+  {
+   "from": "n7",
+   "to": "n8",
+   "kind": "data",
+   "label": "検査を通った PR"
+  },
+  {
+   "from": "n3",
+   "to": "n8",
+   "kind": "data",
+   "label": "AGENTS.md"
+  },
+  {
+   "from": "n2",
+   "to": "n8",
+   "kind": "data",
+   "label": "仕様書"
+  },
+  {
+   "from": "n8",
+   "to": "n9",
+   "kind": "data",
+   "label": "レビュー結果つき PR"
+  },
+  {
+   "from": "n7",
+   "to": "n10",
+   "kind": "data",
+   "label": "検査の記録"
+  },
+  {
+   "from": "n8",
+   "to": "n10",
+   "kind": "data",
+   "label": "レビューの指摘"
+  },
+  {
+   "from": "n9",
+   "to": "n10",
+   "kind": "data",
+   "label": "マージと差し戻しの記録"
+  },
+  {
+   "from": "n10",
+   "to": "n11",
+   "kind": "data",
+   "label": "週ごとの集計"
+  },
+  {
+   "from": "n7",
+   "to": "n6",
+   "kind": "fix",
+   "label": "単位・落ちた検査・理由・ログ・範囲"
+  },
+  {
+   "from": "n8",
+   "to": "n6",
+   "kind": "fix",
+   "label": "単位・指摘・出典の行・範囲"
+  },
+  {
+   "from": "n9",
+   "to": "n6",
+   "kind": "fix",
+   "label": "単位・差し戻しの理由・範囲"
+  },
+  {
+   "from": "n7",
+   "to": "n4",
+   "kind": "fix",
+   "label": "3回で通らない単位と経過（計画へ返す）"
+  },
+  {
+   "from": "n11",
+   "to": "n4",
+   "kind": "learn",
+   "label": "分ける軸・依頼文の直し"
+  },
+  {
+   "from": "n11",
+   "to": "n3",
+   "kind": "learn",
+   "label": "規約の追記の提案（テックリードが決める）"
+  },
+  {
+   "from": "n11",
+   "to": "n2",
+   "kind": "learn",
+   "label": "仕様の抜けの提案（プロダクトオーナーが決める）"
+  },
+  {
+   "from": "n6",
+   "to": "n8h",
+   "label": "PR",
+   "until": "step1"
+  },
+  {
+   "from": "n8h",
+   "to": "n9",
+   "label": "承認した PR",
+   "until": "step1"
+  },
+  {
+   "from": "n8h",
+   "to": "n6",
+   "kind": "fix",
+   "label": "レビューの指摘",
+   "until": "step1"
+  },
+  {
+   "from": "n4",
+   "to": "n6",
+   "label": "チケット",
+   "until": "tobe"
+  },
+  {
+   "from": "n9",
+   "to": "dc",
+   "kind": "data",
+   "label": "main へのマージ",
+   "since": "tobe"
+  },
+  {
+   "from": "dc",
+   "to": "n10",
+   "kind": "data",
+   "label": "デプロイの確認の記録",
+   "since": "tobe"
+  },
+  {
+   "from": "dc",
+   "to": "n4",
+   "kind": "fix",
+   "label": "落ちた確認とログ（新しいチケットにする）",
+   "since": "tobe"
+  }
+ ],
+ "ticket_template": "## ゴール\n（使う人から見て何が動くか。例：宿を日付で検索すると、空室のある宿だけが出る）\n\n## 完了の条件（はい・いいえで判定）\n- [ ] テストのコマンドが 0 で終わる\n- [ ] 差分が「計画したファイル」だけ\n- [ ] （仕様書の受け入れ条件を1行ずつ）\n\n## 計画したファイル\n- \n\n## 止めているチケット\n- （無ければ「なし」。本当にデータが要るものだけ）\n\n## 出典\n- 仕様書（Notion）：\n- 規約：AGENTS.md\n\n## 戻しにくさ\nnarrow / wide / irreversible（移行・データの削除・決済を含むなら irreversible）",
+ "version": 2,
+ "phases": [
+  {
+   "id": "asis",
+   "name": "今",
+   "note": "人がレビューしてマージ。評価は無い"
+  },
+  {
+   "id": "step1",
+   "name": "段階1：検査とレビューを自動に"
+  },
+  {
+   "id": "step2",
+   "name": "段階2：CI を入れる",
+   "note": "ノードは変えない。検査を CI に載せ、マージで人が読むのは戻せない変更だけにする"
+  },
+  {
+   "id": "tobe",
+   "name": "目指す形"
+  }
+ ]
+}
