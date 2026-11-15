@@ -395,6 +395,13 @@ try {
     eq(`カードの字が枠に収まる（1280×800 #${h}）`, await js(spill), []);
     eq(`スキル名を切らない（1280×800 #${h}）`, await js(`__cards().map((g) => [...g.querySelectorAll("text")].find((t) => t.getAttribute("font-family") && t.getAttribute("font-family").includes("Mono"))).filter((t) => t && __vis(t) && t.textContent.includes("…")).map((t) => t.closest(".card").dataset.nodeId)`), []);
   }
+  // カードの中の文字（名前・下の 1 行・札）と、下の端の注記の札が重ならない。接するのも窮屈なので 2px の隙間を求める（1280×800 の b・c。b は一覧を出したまま）
+  const tagHit = `__cards().flatMap((g) => { const tag = [...g.children].find((c) => c.tagName === "g" && c.querySelector("rect[stroke='#cfc7ba']")); if (!tag || !__vis(tag)) return []; const b0 = tag.querySelector("rect").getBoundingClientRect(), b = { left: b0.left - 2, right: b0.right + 2, top: b0.top - 2, bottom: b0.bottom + 2 }; return [...g.querySelectorAll("text")].filter((t) => __vis(t) && t.textContent && !tag.contains(t)).filter((t) => { const r = t.getBoundingClientRect(); return Math.min(r.right, b.right) > Math.max(r.left, b.left) + 0.5 && Math.min(r.bottom, b.bottom) > Math.max(r.top, b.top) + 0.5; }).map((t) => g.dataset.nodeId + ":" + t.textContent); })`;
+  for (const h of ["b", "b&sel=n8h", "c&p=asis", "c&p=step1", "c&p=step2", "c"]) { await go(h); check(`一覧を出したまま（1280×800 #${h}）`, !(await js(`document.body.hasAttribute("data-fold")`))); eq(`カードの中の文字と札が重ならない（2px の隙間、1280×800 #${h}）`, await js(tagHit), []); }
+  check("1280×800 の b：省いても理由は一覧とカードの名前（読み上げ）に残る", (await js(`(async () => { location.hash = "b"; await new Promise((ok) => setTimeout(ok, 50)); return document.querySelector("[data-node-id=n8h]").getAttribute("aria-label"); })()`)).includes("足りない：レビューの観点が書かれていない"));
+  await viewport(1440, 900);
+  for (const h of ["a", "b"]) { await go(h); eq(`カードの中の文字と札が重ならない（2px の隙間、1440×900 #${h}）`, await js(tagHit), []); }
+  await viewport(1280, 800);
   await go("c&p=step1");
   check("1280×800 の c：選んだ段階の足りないものが、一覧をスクロールせずに見える", await js(`(() => { const l = [...document.querySelectorAll("#phaseList [aria-selected=true] li")]; return l.length > 0 && l[l.length - 1].getBoundingClientRect().bottom <= innerHeight; })()`));
   await viewport(1440, 900); await open(PAGES.sora + "#b"); await js(HELP);

@@ -832,6 +832,9 @@
       }
       // 名前の位置（1 行か 2 行か、下の 1 行があるか）
       setName(n, nameFS);
+      // 狭い幅で名前を大きくして 2 行に折れ、下の端に注記の札があるときは、名前の下の 1 行を省く（札と重なるため。
+      // カードの高さは変えない＝配置を動かさない。b の理由は右の一覧と詳細に、スキル名は詳細に出る）
+      if (nameFS > NAME && n.lines.length > 1 && n.marksG.childNodes.length && n.marksG.style.display !== "none") { n.sub.textContent = ""; n.sub.removeAttribute("textLength"); n.sub.removeAttribute("lengthAdjust"); }
       const hasSub = !!n.sub.textContent, two = n.lines.length > 1, lh = Math.round(nameFS * 1.12);
       const ys = two ? (hasSub ? [40, 40 + lh] : [46, 46 + lh]) : [hasSub ? 48 : 52];
       [...n.nm.children].forEach((t, i) => t.setAttribute("y", y + ys[i]));
