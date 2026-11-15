@@ -51,6 +51,7 @@
   .node.gap { border: 2px dashed var(--gap); border-left-width: 5px; }
   .node.selected { box-shadow: 0 0 0 3px var(--sel); }
   .node .title { font-size: 13px; font-weight: 600; margin-bottom: 6px; line-height: 1.35; }
+  .node .skills { margin-top: -2px; font-size: 11px; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .node .row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
   .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 9px; font-size: 11px; line-height: 18px; white-space: nowrap; }
   .chip.session-plan { background: var(--plan); color: #fff; }
@@ -231,7 +232,8 @@
     d.dataset.id = n.id;
     if (KIND[n.kind]) d.append(el("span", "kind", KIND[n.kind]));
     d.append(el("div", "title", n.title));
-    // カードは題名とバッジだけ。スキル・ツール・判定・成果物は、クリックで出る詳細と表のタブに出す。
+    // カードは題名、スキル名（あれば1行。収まらなければ … で切る）、バッジだけ。ツール・判定・成果物は、クリックで出る詳細と表のタブに出す。
+    if (n.skills.length) { const sk = el("div", "skills", n.skills.join(" · ")); sk.title = n.skills.join(" · "); d.append(sk); }
     const r1 = el("div", "row"); r1.append(sessionChip(n.session, n.auto));
     if (n.kind === "gate") r1.append(riskChip(n.risk));
     if (n.human) r1.append(el("span", "chip humanflag", "人"));
