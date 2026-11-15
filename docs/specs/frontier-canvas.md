@@ -439,6 +439,8 @@ version 2 の仕様書はそのまま描ける：`human_if` が無ければ 1 �
 
 この設計書の成功の定義で、今の図（3e4fc5c）と、見せ方のモックを評価する。直した図ができたら、同じ手順で前と後を比べる。
 
+3e4fc5c と #27 のあと（47f1b3f）を比べた結果：[frontier-canvas/eval/2026-11-16.md](frontier-canvas/eval/2026-11-16.md)。答え合わせの表は [frontier-canvas/answer_key.py](frontier-canvas/answer_key.py) で作る。
+
 参考にした考え方（どれも上流の固定した版の SKILL.md を読んだ。文は写していない）：
 
 - anthropic-design の user-research（[knowledge-work-plugins@e91a134](https://github.com/anthropics/knowledge-work-plugins/tree/e91a134584eb798bac7fb0379358006a2b63b965/design/skills/user-research)）：画面を評価する前に、誰がどんな作業をするかから始める。場面ごとの問いの形にした。
