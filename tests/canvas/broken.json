@@ -1,0 +1,34 @@
+{
+ "team": "欠け",
+ "nodes": [
+  {
+   "id": "x",
+   "title": "何か",
+   "stage": "zz",
+   "role": "who"
+  },
+  {
+   "id": "y",
+   "title": "関門",
+   "kind": "gate",
+   "stage": "zz"
+  }
+ ],
+ "edges": [
+  {
+   "from": "x",
+   "to": "nope"
+  }
+ ],
+ "phases": [
+  {
+   "id": "p1"
+  }
+ ],
+ "triggers": [
+  {
+   "to": "x",
+   "by": "magic"
+  }
+ ]
+}
