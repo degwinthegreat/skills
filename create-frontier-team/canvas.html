@@ -81,7 +81,7 @@
   .mark.info { background: #0284c7; } .mark.warn { background: #d97706; } .mark.error { background: #dc2626; } .mark.muted { background: #64748b; }
   .node.marked-muted { opacity: .45; }
   .node .mark.phase { position: absolute; top: -10px; left: 10px; right: auto; z-index: 4; }
-  .node .mark.phase.new { background: #0369a1; } .node .mark.phase.end { background: #64748b; }
+  .node .mark.phase.new { background: #0369a1; } .node .mark.phase.end { background: #64748b; } .node .mark.phase.chg { background: #7c3aed; }
   path.edge.mark-info { stroke: #0284c7; stroke-opacity: 1; } path.edge.mark-warn { stroke: #d97706; stroke-opacity: 1; } path.edge.mark-error { stroke: #dc2626; stroke-opacity: 1; } path.edge.mark-muted { stroke-opacity: .2; }
   .edge-mark rect { rx: 8; } .edge-mark text { font-size: 11px; fill: #fff; }
   .edge-mark.info rect { fill: #0284c7; } .edge-mark.warn rect { fill: #d97706; } .edge-mark.error rect { fill: #dc2626; } .edge-mark.muted rect { fill: #64748b; }
@@ -230,6 +230,9 @@
     return { since: phaseIx.has(since) ? since : "", until: phaseIx.has(until) ? until : "" };
   };
   const aliveAt = (o, p) => p < 0 || ((!o.since || phaseIx.get(o.since) <= p) && (!o.until || phaseIx.get(o.until) > p));
+  // 足りないもの（gap）は、文か、段階を付けた {text, since, until}（その配列も可）。段階を付けたものは、その段階の図でだけ数える。
+  const gapsOf = (v, what) => arr(v).map((g) => g && typeof g === "object" ? Object.assign({ text: str(g.text) }, lifeOf(g, what + "の gap")) : { text: str(g), since: "", until: "" }).filter((g) => g.text);
+  const gapAt = (o, p) => o.gaps.filter((g) => aliveAt(g, p)).map((g) => g.text).join("／");
   // カードには短い名前（short）を出す。無ければ題名から括弧の中を除いたもの。題名の全文は詳細に出す。
   const shortTitle = (t) => { const s = t.replace(/[（(][^（）()]*[）)]/g, "").replace(/\s+/g, " ").trim(); return s || t; };
   const tools = new Map();
@@ -243,36 +246,52 @@
     const node = {
       id: str(n.id, "n" + i), title: str(n.title || n.name, "（名前なし）"), stage: str(n.stage), role: str(n.role),
       skills: arr(n.skills).map(String), session: str(n.session), layer: str(n.layer, "task"), tools: arr(n.tools).map(String),
-      output: str(n.output), gap: str(n.gap), note: str(n.note),
+      output: str(n.output), note: str(n.note),
       kind: str(n.kind), risk: str(n.risk), human: n.human === true, check: str(n.check), short: str(n.short),
     };
     Object.assign(node, lifeOf(n, `ノード「${node.title}」`));
+    node.gaps = gapsOf(n.gap, `ノード「${node.title}」`);
     node.card = node.short || shortTitle(node.title);
-    // 関門の中の検査。ノードと同じキー（title・session・check・skills・tools・gap）の小さな形。session を省くと自動。
+    // 関門の中の検査。ノードと同じキー（title・session・check・skills・tools・gap・since・until）の小さな形。session を省くと自動。
+    // 段階で検査が増えたり減ったりしても、検査の ID（id、無ければ全体の並びの番号）は変わらない。
     node.checks = arr(n.checks).map((c, j) => {
       c = c && typeof c === "object" ? c : { title: str(c) };
       const ck = { id: str(c.id, String(j + 1)), title: str(c.title || c.name, "（名前なし）"), session: str(c.session), check: str(c.check),
-        skills: arr(c.skills).map(String), tools: arr(c.tools).map(String), gap: str(c.gap) };
-      ck.key = node.id + "/" + ck.id; ck.auto = !SESSION[ck.session]; ck.isGap = !!ck.gap; ck.tools.forEach(toolOf);
+        skills: arr(c.skills).map(String), tools: arr(c.tools).map(String) };
+      Object.assign(ck, lifeOf(c, `検査「${node.title}／${ck.title}」`));
+      ck.gaps = gapsOf(c.gap, `検査「${node.title}／${ck.title}」`);
+      ck.key = node.id + "/" + ck.id; ck.auto = !SESSION[ck.session]; ck.tools.forEach(toolOf);
       return ck;
     });
     if (!stageIx.has(node.stage)) { const id = node.stage || "_nostage"; if (!stageIx.has(id)) { stageIx.set(id, stages.length); stages.push({ id, name: node.stage || "（段なし）" }); } node.stage = id; }
     if (!roleIx.has(node.role)) { const id = node.role || "_norole"; if (!roleIx.has(id)) { roleIx.set(id, roles.length); roles.push({ id, name: node.role || "（役割なし）", missing: true }); } node.role = id; }
     node.missing = [];
     node.auto = !SESSION[node.session] && (node.kind === "code" || node.kind === "gate");
+    // 人（actor が human）の行で session を省いた作業は、人が動かす作業とみなす。
+    if (!SESSION[node.session] && !node.auto && roles[roleIx.get(node.role)].actor === "human") node.session = "human";
     if (!SESSION[node.session] && !node.auto) node.missing.push("セッション");
     if (roles[roleIx.get(node.role)].missing) node.missing.push("役割");
-    // 中の検査があるときは、足りないかを検査ごとに見る（ノードのスキルの有無では決めない）。
-    const noSkill = !node.checks.length && node.skills.length === 0 && node.session !== "human" && !node.auto && node.kind !== "code";
-    const checkGaps = node.checks.filter((c) => c.isGap).length;
-    node.isGap = !!node.gap || node.missing.length > 0 || noSkill || checkGaps > 0;
-    // カードに出す、何が足りないかの短い印。理由の文章（gap）は詳細に出す。
-    node.gapTags = node.missing.map((m) => m + "不明").concat(noSkill ? ["スキル無し"] : [], checkGaps ? [`足りない検査 ${checkGaps}`] : []);
-    if (node.isGap && !node.gapTags.length) node.gapTags.push(node.skills.length || node.kind === "code" || node.checks.length ? "足りない" : "スキル無し");
+    // 人が動かす作業とコードは、スキルが無くても足りないものにしない（印も「スキル無し」にしない）。
+    // エージェントのセッション（計画・実行）の作業は、スキルが無ければ足りない。自動の関門は、gap に書いたときだけ足りない。
+    node.skillless = node.skills.length === 0 && node.session !== "human" && node.kind !== "code";
+    node.wantsSkill = node.skillless && (node.session === "plan" || node.session === "run");
     node.tools.forEach(toolOf);
     return node;
   });
   const byId = new Map(nodes.map((n) => [n.id, n]));
+  // 段階 p でのノードの足りないもの（p が -1 なら全部を重ねる）。カード・詳細・「足りないもの」のタブは、どれもここから読む。
+  const stateAt = (n, p) => {
+    const checks = n.checks.filter((c) => aliveAt(c, p));
+    const gap = gapAt(n, p);
+    // 中の検査があるときは、足りないかを検査ごとに見る（ノードのスキルの有無では決めない）。
+    const noSkill = n.wantsSkill && !checks.length;
+    const checkGaps = checks.filter((c) => gapAt(c, p)).length;
+    const isGap = !!gap || n.missing.length > 0 || noSkill || checkGaps > 0;
+    // カードに出す、何が足りないかの短い印。理由の文章（gap）は詳細に出す。
+    const tags = n.missing.map((m) => m + "不明").concat(noSkill ? ["スキル無し"] : [], checkGaps ? [`足りない検査 ${checkGaps}`] : []);
+    if (isGap && !tags.length) tags.push(n.skillless && !checks.length ? "スキル無し" : "足りない");
+    return { checks, gap, isGap, tags };
+  };
   const edges = [];
   const edgeIds = new Set();
   arr(D.edges).forEach((e, i) => {
@@ -313,7 +332,7 @@
   const world = document.getElementById("world"), svg = document.getElementById("edges"), viewport = document.getElementById("viewport");
   const nodeEls = new Map();
   nodes.forEach((n) => {
-    const d = el("div", "node" + (n.layer === "upstream" ? " upstream" : "") + (n.kind === "gate" ? " gate" : "") + (n.isGap ? " gap" : ""));
+    const d = el("div", "node" + (n.layer === "upstream" ? " upstream" : "") + (n.kind === "gate" ? " gate" : ""));
     d.dataset.id = n.id; d.dataset.nodeId = n.id; d.title = n.title;
     // カードはパッと見で分かることだけ：1行目に種類と誰が動かすか（と関門の戻しにくさ・人）、短い名前、スキル名（あれば1行）、
     // 足りないもの・段階・関門の中の検査の印。題名の全文・判定・成果物・ツール・理由の文章は、クリックで出る詳細と表のタブに出す。
@@ -326,20 +345,34 @@
     if (n.human) top.append(el("span", "chip humanflag", "人"));
     d.append(top, el("div", "title", n.card));
     if (n.skills.length) { const sk = el("div", "skills", n.skills.join(" · ")); sk.title = n.skills.join(" · "); d.append(sk); }
-    const r1 = el("div", "row");
-    n.gapTags.forEach((t) => r1.append(el("span", "chip gapflag", t)));
-    if (n.checks.length) {
+    // 足りないものの印と検査の数は段階で変わるので、fillCard で段階ごとに入れ直す。
+    n._row = el("div", "row"); d.append(n._row);
+    // 段階の印は、カードの高さを変えないよう枠の上に重ねる（段階を切り替えても配置が動かない）。
+    n._phaseBadge = el("span", "mark inline phase"); n._phaseBadge.hidden = true; d.append(n._phaseBadge);
+    world.append(d); nodeEls.set(n.id, d);
+  });
+
+  // 段階 p のカードの中身（足りないものの印・破線の枠・検査の数と点）を入れる。
+  const fillCard = (n, p) => {
+    const st = stateAt(n, p), d = nodeEls.get(n.id), r1 = n._row;
+    d.classList.toggle("gap", st.isGap);
+    r1.replaceChildren();
+    st.tags.forEach((t) => r1.append(el("span", "chip gapflag", t)));
+    if (st.checks.length) {
       const b = el("button", "checks-btn"); b.type = "button"; b.title = "中の検査を開く";
-      b.append(el("span", null, "検査 " + n.checks.length));
-      n.checks.forEach((c) => { const dot = el("i"); dot.style.background = c.isGap ? "var(--gap)" : c.session === "human" ? "var(--ink)" : c.session === "run" ? "var(--run)" : c.session === "plan" ? "var(--plan)" : "var(--human)"; b.append(dot); });
+      b.append(el("span", null, "検査 " + st.checks.length));
+      st.checks.forEach((c) => { const dot = el("i"); dot.style.background = gapAt(c, p) ? "var(--gap)" : c.session === "human" ? "var(--ink)" : c.session === "run" ? "var(--run)" : c.session === "plan" ? "var(--plan)" : "var(--human)"; b.append(dot); });
       b.append(el("span", null, "▾"));
       b.addEventListener("click", (ev) => { ev.stopPropagation(); toggleChecks(n.id); });
       r1.append(b);
     }
-    if (r1.childElementCount) d.append(r1);
-    // 段階の印は、カードの高さを変えないよう枠の上に重ねる（段階を切り替えても配置が動かない）。
-    n._phaseBadge = el("span", "mark inline phase"); n._phaseBadge.hidden = true; d.append(n._phaseBadge);
-    world.append(d); nodeEls.set(n.id, d);
+    r1.hidden = !r1.childElementCount;
+  };
+  // カードの高さは、すべての段階（と「全部」）でいちばん高いものに揃える。段階を切り替えても配置が動かない。
+  nodes.forEach((n) => {
+    let h = 0;
+    [-1].concat(phases.map((_, i) => i)).forEach((p) => { fillCard(n, p); h = Math.max(h, nodeEls.get(n.id).offsetHeight); });
+    nodeEls.get(n.id).style.minHeight = h + "px";
   });
 
   // 高さを測ってから、決まった順で置く
@@ -632,16 +665,19 @@
   }
 
   // ---- 関門の中の検査 ----
-  const checksList = (n) => {
+  // p を渡すと、その段階に在る検査だけを出す。表（段階に関係なく全部を並べる）では p を渡さず、段階を添える。
+  const checksList = (n, p) => {
     const ol = el("ol", "checks");
-    n.checks.forEach((c) => {
-      const li = el("li", c.isGap ? "gap" : ""); li.dataset.checkId = c.key;
+    n.checks.filter((c) => p == null || aliveAt(c, p)).forEach((c) => {
+      const gap = gapAt(c, p == null ? -1 : p);
+      const li = el("li", gap ? "gap" : ""); li.dataset.checkId = c.key;
       li.append(sessionChip(c.session, c.auto), el("b", null, c.title));
       const sub = [];
       if (c.check) sub.push("判定：" + c.check);
       if (c.skills.length) sub.push("スキル：" + c.skills.join("、"));
       if (c.tools.length) sub.push("ツール：" + c.tools.map((t) => toolOf(t).name).join("、"));
-      if (c.gap) sub.push("足りない：" + c.gap);
+      if (gap) sub.push("足りない：" + gap);
+      if (p == null && phases.length && (c.since || c.until)) sub.push("段階：" + phaseRange(c));
       sub.forEach((x) => li.append(el("span", "sub", x)));
       const ms = marksOf.get("check:" + c.key) || [];
       if (ms.length) { const w = el("span", "sub"); ms.forEach((m) => w.append(markBadge(m, true), " ", m.text, " ")); li.append(w); }
@@ -656,7 +692,8 @@
     const was = pop && pop.dataset.nodeId === id; closeChecks(); select(id, true); if (was) return;
     const n = byId.get(id), p = pos.get(id);
     pop = el("div", "checks-pop"); pop.dataset.nodeId = id;
-    pop.append(el("h3", null, `中の検査（${n.checks.length}）`), checksList(n));
+    const live = n.checks.filter((c) => aliveAt(c, phase));
+    pop.append(el("h3", null, `中の検査（${live.length}）`), checksList(n, phase));
     if (n.check) pop.append(el("div", "pop-foot", "通す条件：" + n.check));
     Object.assign(pop.style, { left: p.x + "px", top: p.y + p.h + 6 + "px" });
     pop.addEventListener("pointerdown", (ev) => ev.stopPropagation());
@@ -687,7 +724,8 @@
     if (n.kind === "gate") item("戻しにくさ", riskChip(n.risk));
     if (n.human) item("人", el("span", "chip humanflag", "人を置く関門"));
     if (n.check) item(n.checks.length ? "通す条件" : "判定", n.check);
-    if (n.checks.length) item(`中の検査（${n.checks.length}）`, checksList(n));
+    const st = stateAt(n, phase);
+    if (st.checks.length) item(`中の検査（${st.checks.length}）`, checksList(n, phase));
     item("スキル", ...(n.skills.length ? n.skills.map((x) => el("span", "chip skill", x)) : ["無し"]));
     item("ツール", ...(n.tools.length ? n.tools.map(toolBadge) : ["無し"]));
     if (n.output) item("成果物", n.output);
@@ -697,7 +735,7 @@
     item("受け取る", ins.length ? ins.join("、") : "無し");
     item("渡す", outs.length ? outs.join("、") : "無し");
     if (n.note) item("メモ", n.note);
-    if (n.isGap) { const g = el("span", "gaptext", n.gap || ("欠けている：" + n.gapTags.join("、"))); item("足りないもの", g); }
+    if (st.isGap) { const g = el("span", "gaptext", st.gap || ("欠けている：" + st.tags.join("、"))); item("足りないもの", g); }
     detail.replaceChildren(close, el("h2", null, n.title), dl); detail.hidden = false;
   };
   nodeEls.forEach((e, id) => e.addEventListener("click", (ev) => { ev.stopPropagation(); select(id); }));
@@ -708,12 +746,13 @@
   ["段", "役割", "ノード", "種類", "スキル", "セッション", "ツール", "成果物", "層"].concat(phases.length ? ["段階"] : []).forEach((h) => thead.append(el("th", null, h)));
   table.append(thead);
   sorted.forEach((n) => {
-    const tr = el("tr", n.isGap ? "gaprow" : "");
+    const tr = el("tr", [-1].concat(phases.map((_, i) => i)).some((p) => stateAt(n, p).isGap) ? "gaprow" : "");
     const cell = (...c) => { const td = el("td"); const r = el("div", "row"); c.forEach((x) => r.append(typeof x === "string" ? el("span", null, x) : x)); td.append(r); tr.append(td); return td; };
     cell(stageName(n.stage)); cell(roleName(n.role));
     const tc = cell(n.title); if (n.checks.length) tc.append(checksList(n));
     cell(...[KIND[n.kind] || "—"].concat(n.kind === "gate" ? [riskChip(n.risk)] : [], n.human ? [el("span", "chip humanflag", "人")] : []));
-    cell(...(n.skills.length ? n.skills.map((x) => el("span", "chip skill", x)) : [el("span", "chip gapflag", "無し")]));
+    // 赤い「無し」は、人の作業とコードには出さない。
+    cell(...(n.skills.length ? n.skills.map((x) => el("span", "chip skill", x)) : [n.skillless && !n.checks.length ? el("span", "chip gapflag", "無し") : "—"]));
     cell(sessionChip(n.session, n.auto)); cell(...(n.tools.length ? n.tools.map(toolBadge) : ["—"])); cell(n.output || "—"); cell(layerChip(n.layer));
     if (phases.length) cell(phaseRange(n));
     table.append(tr);
@@ -727,11 +766,12 @@
   // ---- 足りないもの（選んでいる段階で数える。段階が無ければ全部） ----
   const renderGaps = () => {
     const ns = nodes.filter(nodeAlive), es = edges.filter(edgeAlive);
+    const st = new Map(ns.map((n) => [n.id, stateAt(n, phase)]));
     const gaps = [];
-    stages.forEach((s) => { const inStage = ns.filter((n) => n.stage === s.id); if (!inStage.length) gaps.push(`段「${s.name}」にノードが無い`); else if (inStage.every((n) => n.isGap)) gaps.push(`段「${s.name}」に、スキルの決まったノードが無い`); });
+    stages.forEach((s) => { const inStage = ns.filter((n) => n.stage === s.id); if (!inStage.length) gaps.push(`段「${s.name}」にノードが無い`); else if (inStage.every((n) => st.get(n.id).isGap)) gaps.push(`段「${s.name}」に、スキルの決まったノードが無い`); });
     // 検査だけが足りないノードは、下の検査ごとの行で出す。
-    ns.filter((n) => n.isGap && (n.gap || n.gapTags.some((t) => !t.startsWith("足りない検査")))).forEach((n) => gaps.push(`${stageName(n.stage)} / ${roleName(n.role)} の「${n.title}」：${n.gap || "欠けている：" + n.gapTags.filter((t) => !t.startsWith("足りない検査")).join("、")}`));
-    ns.forEach((n) => n.checks.filter((c) => c.isGap).forEach((c) => gaps.push(`関門「${n.title}」の検査「${c.title}」：${c.gap}`)));
+    ns.forEach((n) => { const x = st.get(n.id), tags = x.tags.filter((t) => !t.startsWith("足りない検査")); if (x.isGap && (x.gap || tags.length)) gaps.push(`${stageName(n.stage)} / ${roleName(n.role)} の「${n.title}」：${x.gap || "欠けている：" + tags.join("、")}`); });
+    ns.forEach((n) => st.get(n.id).checks.forEach((c) => { const g = gapAt(c, phase); if (g) gaps.push(`関門「${n.title}」の検査「${c.title}」：${g}`); }));
     const task = ns.filter((n) => n.layer !== "upstream");
     if (!es.some((e) => e.kind === "learn")) gaps.push("学びの辺が無い（評価から、分ける所の指示か上流へ戻す矢印）。速くはなっても、賢くならない");
     if (!es.some((e) => e.kind === "fix")) gaps.push("直しの辺が無い（関門から、その単位を作った実行へ差し戻す矢印）");
@@ -740,7 +780,7 @@
     task.filter((n) => n.session === "human" && !n.human).forEach((n) => gaps.push(`「${n.title}」：タスクの流れの途中に人がいる。人を置くのは1か所に絞る`));
     ns.filter((n) => n.kind === "gate" && !RISK[n.risk]).forEach((n) => gaps.push(`関門「${n.title}」：戻しにくさが書かれていない`));
     ns.filter((n) => n.kind === "gate" && n.risk === "irreversible" && !n.human).forEach((n) => gaps.push(`関門「${n.title}」：戻せない変更を、人を置かずに通している`));
-    ns.filter((n) => (n.kind === "work" || n.kind === "gate") && !n.check && !(n.checks.length && n.checks.every((c) => c.check))).forEach((n) => gaps.push(`「${n.title}」：判定（プログラムで評価できる形）が書かれていない`));
+    ns.filter((n) => (n.kind === "work" || n.kind === "gate") && !n.check && !(st.get(n.id).checks.length && st.get(n.id).checks.every((c) => c.check))).forEach((n) => gaps.push(`「${n.title}」：判定（プログラムで評価できる形）が書かれていない`));
     task.filter((n) => !KIND[n.kind]).forEach((n) => gaps.push(`「${n.title}」：ノードの種類（分ける・実行・コード・関門）が書かれていない`));
     if (D.version == null) gaps.push("仕様書に version が無い（この図は version 2 の形として読んだ）");
     else if (![1, 2].includes(Number(D.version))) gaps.push(`仕様書の version が ${D.version}（この図が読むのは version 1 と 2）`);
@@ -748,18 +788,36 @@
     problems.forEach((p) => gaps.push(p));
     const ul = el("ul", "gaps"); gaps.forEach((g) => ul.append(el("li", null, g)));
     const h = "足りないもの" + (phase >= 0 ? `（段階：${phases[phase].name}）` : "");
-    document.getElementById("gapDoc").replaceChildren(el("h2", null, h), gaps.length ? ul : el("p", null, "見つかりませんでした。"));
+    // 段階の説明（note）と、前の段階から何が変わったか。ヘッダーに足さず、このタブの本文に出す。
+    const about = [];
+    if (phase >= 0 && phases[phase].note) about.push(phases[phase].note);
+    if (phase > 0) {
+      const prev = nodes.filter((n) => aliveAt(n, phase - 1));
+      const added = ns.filter((n) => !aliveAt(n, phase - 1)), gone = prev.filter((n) => !nodeAlive(n)), changed = ns.filter((n) => changedAt(n, phase));
+      const part = (label, list) => list.length ? `${label}：${list.map((n) => n.card).join("、")}` : "";
+      const diff = [part("足す", added), part("無くす", gone), part("変わる", changed)].filter(Boolean);
+      about.push(`${phases[phase - 1].name}から ` + (diff.length ? diff.join("／") : "ノードの変わりは無い"));
+    }
+    document.getElementById("gapDoc").replaceChildren(el("h2", null, h), ...about.map((t) => el("p", null, t)), gaps.length ? ul : el("p", null, "見つかりませんでした。"));
     const gc = document.getElementById("gapCount"); gc.textContent = gaps.length; gc.hidden = !gaps.length;
   };
 
   // ---- 段階の切り替え（既定は最後の段階＝目指す形。「全部」はすべてを重ねて出す） ----
+  // 前の段階から変わったか：ノードの有無は同じでも、中の検査・足りないもの・矢印が変われば変わったとみなす。
+  // 矢印は、両端のノードが前の段階にも在るものだけを見る（新しいノードにつながる矢印では、相手を「変わる」にしない）。
+  const sigAt = (n, p) => JSON.stringify([stateAt(n, p).checks.map((c) => c.key + ":" + gapAt(c, p)), gapAt(n, p)]);
+  const changedAt = (n, p) => p > 0 && aliveAt(n, p - 1) && aliveAt(n, p) && (sigAt(n, p) !== sigAt(n, p - 1) ||
+    edges.some((e) => (e.from === n.id || e.to === n.id) && [e.from, e.to].every((id) => aliveAt(byId.get(id), p) && aliveAt(byId.get(id), p - 1)) && aliveAt(e, p) !== aliveAt(e, p - 1)));
   const refreshPhase = () => {
+    closeChecks();
     nodes.forEach((n) => {
       const d = nodeEls.get(n.id), b = n._phaseBadge;
       d.classList.toggle("off", !nodeAlive(n));
+      fillCard(n, phase);
       let txt = "", cls = "";
       if (phases.length && phase >= 0) {
         if (n.since && phaseIx.get(n.since) === phase && phase > 0) { txt = "＋ この段階で足す"; cls = "new"; }
+        else if (changedAt(n, phase)) { txt = "◇ この段階で変わる"; cls = "chg"; }
         else if (n.until && phaseIx.get(n.until) === phase + 1) { txt = "次の段階で無くなる"; cls = "end"; }
       } else if (phases.length && (n.since || n.until)) { txt = phaseRange(n); cls = n.until ? "end" : "new"; }
       b.textContent = txt; b.hidden = !txt; b.className = "mark phase " + cls;
