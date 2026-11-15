@@ -34,7 +34,7 @@
   section { position: absolute; inset: 0; overflow: auto; }
   section[hidden] { display: none; }
 
-  #viewport { position: absolute; inset: 0; overflow: hidden; cursor: grab; background-image: radial-gradient(#d4d8e0 1px, transparent 1px); background-size: 20px 20px; }
+  #viewport { position: absolute; inset: 0; overflow: hidden; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; background-image: radial-gradient(#d4d8e0 1px, transparent 1px); background-size: 20px 20px; }
   #viewport.dragging { cursor: grabbing; }
   #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
   #edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
@@ -46,11 +46,12 @@
   .col-head small { font-weight: 400; color: var(--upstream); font-size: 11px; }
   .col-tint { position: absolute; background: var(--upstream-tint); }
 
-  .node { position: absolute; width: 216px; background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--task); border-radius: 10px; padding: 9px 10px 10px; font-size: 12px; box-shadow: 0 1px 3px rgba(20,30,50,.08); cursor: pointer; user-select: none; }
+  .node { position: absolute; width: 184px; background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--task); border-radius: 10px; padding: 9px 10px 10px; font-size: 12px; box-shadow: 0 1px 3px rgba(20,30,50,.08); cursor: pointer; user-select: none; }
   .node.upstream { border-left-color: var(--upstream); }
   .node.gap { border: 2px dashed var(--gap); border-left-width: 5px; }
   .node.selected { box-shadow: 0 0 0 3px var(--sel); }
   .node .title { font-size: 13px; font-weight: 600; margin-bottom: 6px; line-height: 1.35; }
+  .node .skills { margin-top: -2px; font-size: 11px; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .node .row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
   .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 9px; font-size: 11px; line-height: 18px; white-space: nowrap; }
   .chip.session-plan { background: var(--plan); color: #fff; }
@@ -69,8 +70,6 @@
   .chip.risk-wide { background: #fef3c7; color: #92400e; }
   .chip.risk-irreversible { background: #fee2e2; color: #991b1b; font-weight: 600; }
   .chip.humanflag { background: var(--ink); color: #fff; }
-  .node .check { margin-top: 6px; font-size: 11px; color: var(--ink); background: #f3f4f6; border-radius: 6px; padding: 3px 6px; }
-  .node .out { margin-top: 6px; color: var(--sub); font-size: 11px; }
   .edge-label { font-size: 11px; fill: var(--sub); }
   .edge-label-bg { fill: var(--bg); }
   path.edge { fill: none; stroke: var(--edge); stroke-width: 1.6; stroke-opacity: .55; }
@@ -92,9 +91,10 @@
   #detail dd { margin: 2px 0 0; display: flex; flex-wrap: wrap; gap: 4px; }
   #detail .close { position: absolute; right: 10px; top: 8px; border: none; background: none; font-size: 18px; cursor: pointer; color: var(--sub); }
   #detail .gaptext { color: var(--gap); }
-  .zoom { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 4px; }
+  .zoom { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 4px; align-items: center; }
   .zoom button { width: 34px; height: 30px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; cursor: pointer; font-size: 14px; }
   .zoom button.wide { width: auto; padding: 0 10px; font-size: 12px; }
+  .zoom .hint { margin-left: 8px; padding: 4px 8px; font-size: 12px; color: var(--sub); background: rgba(255,255,255,.9); border: 1px solid var(--line); border-radius: 6px; }
 
   .doc { padding: 20px 24px; max-width: 1200px; }
   table { border-collapse: collapse; width: 100%; background: var(--panel); font-size: 13px; }
@@ -119,7 +119,7 @@
   </nav>
   <div class="legend">
     <span><span class="chip session-plan">計画</span><span class="chip session-run">実行</span><span class="chip session-human">人</span>セッション（自動＝スクリプト・CI）</span>
-    <span><span class="chip layer-upstream">上流</span><span class="chip layer-task">タスク</span></span>
+    <span><span class="chip layer-upstream">上流</span><span class="chip layer-task">タスク</span>カードの左の線（紫・緑）</span>
     <span><span class="chip risk-narrow">戻せて狭い</span><span class="chip risk-wide">戻せるが広い</span><span class="chip risk-irreversible">戻せない</span>関門</span>
     <span><span class="chip humanflag">人</span>人を置く関門</span>
     <span class="toggles">矢印：<label><input type="checkbox" data-edge="data" checked><i class="ln"></i>データ</label><label><input type="checkbox" data-edge="fix" checked><i class="ln fix"></i>直し</label><label><input type="checkbox" data-edge="learn"><i class="ln learn"></i>学び</label></span>
@@ -131,9 +131,10 @@
     <div id="viewport"><div id="world"><svg id="edges"></svg></div></div>
     <aside id="detail" hidden></aside>
     <div class="zoom">
-      <button id="zoomIn" title="拡大">＋</button>
-      <button id="zoomOut" title="縮小">－</button>
-      <button id="zoomFit" class="wide" title="全体を表示">全体</button>
+      <button id="zoomIn" title="拡大（+）" aria-label="拡大">＋</button>
+      <button id="zoomOut" title="縮小（-）" aria-label="縮小">－</button>
+      <button id="zoomFit" class="wide" title="全体を表示（0）">全体</button>
+      <span class="hint">ドラッグ・スクロールで移動 ／ ピンチ・⌘か Ctrl＋スクロールで拡大縮小 ／ キー：＋ − 0（全体）矢印 ／ ノードをクリックで詳細</span>
     </div>
   </section>
   <section id="tableView" hidden><div class="doc" id="tableDoc"></div></section>
@@ -223,7 +224,7 @@
   const stageName = (id) => stages[stageIx.get(id)].name;
 
   // ---- キャンバス ----
-  const COL_W = 280, NODE_W = 216, HEAD_W = 156, HEAD_H = 44, PAD = 32, GAP_Y = 14, MIN_LANE = 110;
+  const COL_W = 248, NODE_W = 184, HEAD_W = 156, HEAD_H = 44, PAD = 32, GAP_Y = 14, MIN_LANE = 110;
   const world = document.getElementById("world"), svg = document.getElementById("edges"), viewport = document.getElementById("viewport");
   const nodeEls = new Map();
   nodes.forEach((n) => {
@@ -231,14 +232,12 @@
     d.dataset.id = n.id;
     if (KIND[n.kind]) d.append(el("span", "kind", KIND[n.kind]));
     d.append(el("div", "title", n.title));
-    const r1 = el("div", "row"); r1.append(sessionChip(n.session, n.auto), layerChip(n.layer));
+    // カードは題名、スキル名（あれば1行。収まらなければ … で切る）、バッジだけ。ツール・判定・成果物は、クリックで出る詳細と表のタブに出す。
+    if (n.skills.length) { const sk = el("div", "skills", n.skills.join(" · ")); sk.title = n.skills.join(" · "); d.append(sk); }
+    const r1 = el("div", "row"); r1.append(sessionChip(n.session, n.auto));
     if (n.kind === "gate") r1.append(riskChip(n.risk));
     if (n.human) r1.append(el("span", "chip humanflag", "人"));
     if (n.isGap) r1.append(el("span", "chip gapflag", "足りない")); d.append(r1);
-    if (n.skills.length) { const r = el("div", "row"); n.skills.forEach((s) => r.append(el("span", "chip skill", s))); d.append(r); }
-    if (n.tools.length) { const r = el("div", "row"); n.tools.forEach((t) => r.append(toolBadge(t))); d.append(r); }
-    if (n.check) d.append(el("div", "check", "判定：" + n.check));
-    if (n.output) d.append(el("div", "out", "→ " + n.output));
     world.append(d); nodeEls.set(n.id, d);
   });
 
@@ -304,8 +303,10 @@
   nodes.forEach((n) => {
     const outs = edges.filter((e) => e.from === n.id).sort((x, y) => cy(x.to) - cy(y.to));
     const ins = edges.filter((e) => e.to === n.id).sort((x, y) => cy(x.from) - cy(y.from));
-    outs.forEach((e, k) => { e._sy = cy(n.id) + (k - (outs.length - 1) / 2) * 10; });
-    ins.forEach((e, k) => { e._ty = cy(n.id) + (k - (ins.length - 1) / 2) * 10; });
+    // 口の間隔は 10px。本数が多くてカードからはみ出すときは、カードの高さに収まるよう詰める。
+    const step = (m) => (m > 1 ? Math.min(10, (pos.get(n.id).h - 16) / (m - 1)) : 0);
+    outs.forEach((e, k) => { e._sy = cy(n.id) + (k - (outs.length - 1) / 2) * step(outs.length); });
+    ins.forEach((e, k) => { e._ty = cy(n.id) + (k - (ins.length - 1) / 2) * step(ins.length); });
   });
   // 引いた線の縦・横の線分。横の線を通す境目は、これと交わる数がいちばん少ないものを選ぶ。
   const segs = [];
@@ -396,20 +397,80 @@
   Object.assign(svg.style, { width: W + "px", height: H + "px" }); svg.setAttribute("width", W); svg.setAttribute("height", H);
   world.style.width = W + "px"; world.style.height = H + "px";
 
-  // パンとズーム
+  // パンとズーム。初めは文字が読める倍率（題名 13px が 12px 以上）で流れの始まりを出す。全体が読める倍率で収まるときは全体を出す。
+  const READABLE = 12 / 13;
   let k = 1, tx = 0, ty = 0;
-  const apply = () => { world.style.transform = `translate(${tx}px,${ty}px) scale(${k})`; };
+  const clampPan = () => {
+    const vw = viewport.clientWidth, vh = viewport.clientHeight, m = 80;
+    tx = Math.min(vw - m, Math.max(m - W * k, tx)); ty = Math.min(vh - m, Math.max(m - H * k, ty));
+  };
+  const apply = () => { clampPan(); world.style.transform = `translate(${tx}px,${ty}px) scale(${k})`; };
   const zoomAt = (f, cx, cy) => { const nk = Math.min(2.5, Math.max(0.2, k * f)); tx = cx - (cx - tx) * (nk / k); ty = cy - (cy - ty) * (nk / k); k = nk; apply(); };
-  const fit = () => { const vw = viewport.clientWidth, vh = viewport.clientHeight; k = Math.min(1, (vw - 40) / W, (vh - 40) / H); tx = (vw - W * k) / 2; ty = Math.max(20, (vh - H * k) / 2); apply(); };
-  viewport.addEventListener("wheel", (ev) => { ev.preventDefault(); const r = viewport.getBoundingClientRect(); zoomAt(Math.exp(-ev.deltaY * 0.0015), ev.clientX - r.left, ev.clientY - r.top); }, { passive: false });
+  const fitScale = () => Math.min(1, (viewport.clientWidth - 40) / W, (viewport.clientHeight - 40) / H);
+  const fit = () => { const vw = viewport.clientWidth, vh = viewport.clientHeight; k = fitScale(); tx = (vw - W * k) / 2; ty = Math.max(20, (vh - H * k) / 2); apply(); };
+  const home = () => {
+    if (fitScale() >= READABLE) { fit(); return; }
+    const vh = viewport.clientHeight; k = 1; tx = 20; ty = Math.max(20, (vh - H) / 2); apply();
+  };
+  const panBy = (dx, dy) => { tx -= dx; ty -= dy; apply(); };
+  // ホイール：そのままなら移動（トラックパッドの二本指、マウスのホイール、Shift＋ホイールで横）。
+  // ピンチ（ブラウザは ctrlKey 付きの wheel で送る）と ⌘・Ctrl＋スクロールは拡大縮小。
+  viewport.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    const unit = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? viewport.clientHeight : 1;
+    let dx = ev.deltaX * unit, dy = ev.deltaY * unit;
+    if (ev.ctrlKey || ev.metaKey) {
+      const r = viewport.getBoundingClientRect(), d = Math.max(-30, Math.min(30, dy));
+      zoomAt(Math.exp(-d * 0.008), ev.clientX - r.left, ev.clientY - r.top); return;
+    }
+    if (ev.shiftKey && !dx) { dx = dy; dy = 0; }
+    panBy(dx, dy);
+  }, { passive: false });
+  // ドラッグで移動。左ボタンだけで掴み、離した・取り消された・掴みが外れた・フォーカスが外れたときは必ず放す。
   let drag = null;
-  viewport.addEventListener("pointerdown", (ev) => { if (ev.target.closest(".node")) return; drag = { x: ev.clientX - tx, y: ev.clientY - ty, moved: false }; viewport.classList.add("dragging"); viewport.setPointerCapture(ev.pointerId); });
-  viewport.addEventListener("pointermove", (ev) => { if (!drag) return; tx = ev.clientX - drag.x; ty = ev.clientY - drag.y; drag.moved = true; apply(); });
-  viewport.addEventListener("pointerup", (ev) => { if (drag && !drag.moved) select(null); drag = null; viewport.classList.remove("dragging"); });
+  const endDrag = () => {
+    const d = drag; if (!d) return null;
+    drag = null; viewport.classList.remove("dragging");
+    try { if (viewport.hasPointerCapture(d.id)) viewport.releasePointerCapture(d.id); } catch (_) { /* 掴みがもう無い */ }
+    return d;
+  };
+  viewport.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0 || ev.target.closest(".node")) return;
+    endDrag(); ev.preventDefault();
+    drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, tx, ty, moved: false };
+    viewport.classList.add("dragging");
+    try { viewport.setPointerCapture(ev.pointerId); } catch (_) { /* 掴めなくても、離したときの処理で放す */ }
+  });
+  viewport.addEventListener("pointermove", (ev) => {
+    if (!drag || ev.pointerId !== drag.id) return;
+    if (ev.buttons === 0) { endDrag(); return; }
+    const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    drag.moved = true; tx = drag.tx + dx; ty = drag.ty + dy; apply();
+  });
+  viewport.addEventListener("pointerup", (ev) => { if (!drag || ev.pointerId !== drag.id) return; const d = endDrag(); if (!d.moved) select(null); });
+  viewport.addEventListener("pointercancel", endDrag);
+  viewport.addEventListener("lostpointercapture", endDrag);
+  viewport.addEventListener("dragstart", (ev) => ev.preventDefault());
+  window.addEventListener("blur", endDrag);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) endDrag(); });
   const center = () => [viewport.clientWidth / 2, viewport.clientHeight / 2];
   document.getElementById("zoomIn").onclick = () => zoomAt(1.2, ...center());
   document.getElementById("zoomOut").onclick = () => zoomAt(1 / 1.2, ...center());
   document.getElementById("zoomFit").onclick = fit;
+  // キー：+ と -（JIS の + は Shift＋; なので = も）で拡大縮小、0 で全体、矢印で移動（Shift で大きく）、Esc で選択を外す。
+  // ⌘・Ctrl・Alt 付きはブラウザに任せる。
+  document.addEventListener("keydown", (ev) => {
+    if (document.getElementById("canvasView").hidden || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.target.closest && ev.target.closest("input, textarea, select, [contenteditable]")) return;
+    const step = ev.shiftKey ? 320 : 80;
+    const act = { "+": () => zoomAt(1.2, ...center()), "=": () => zoomAt(1.2, ...center()),
+      "-": () => zoomAt(1 / 1.2, ...center()), "_": () => zoomAt(1 / 1.2, ...center()), "0": fit,
+      ArrowLeft: () => panBy(-step, 0), ArrowRight: () => panBy(step, 0), ArrowUp: () => panBy(0, -step), ArrowDown: () => panBy(0, step),
+      Escape: () => select(null) }[ev.key];
+    if (!act) return;
+    ev.preventDefault(); act();
+  });
 
   // 詳細
   const detail = document.getElementById("detail");
@@ -490,10 +551,10 @@
   document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
     document.querySelectorAll("nav button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
     document.querySelectorAll("main > section").forEach((sec) => { sec.hidden = sec.id !== b.dataset.tab; });
-    if (b.dataset.tab === "canvasView") fit();
+    if (b.dataset.tab === "canvasView") home();
   }));
-  fit();
-  window.addEventListener("resize", fit);
+  home();
+  window.addEventListener("resize", home);
 })();
 </script>
 </body>
