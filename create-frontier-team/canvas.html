@@ -8,236 +8,188 @@
   create-frontier-team の描画。外のファイルやネットワークを使わない、単体で開ける1ファイル。
   仕様書の JSON は、すぐ下の script の中身を置き換えて埋め込む（JSON の中の </ は <\/ にする）。
   JSON の形は create-frontier-team の SKILL.md（進め方の3）の1か所で決める。この HTML が読むのは version 1 と 2。
-  描画は JSON だけで決まる。列は段の順、行（レーン）は役割の順。配置はすべての段階（phases）を合わせて1回だけ決め、
-  段階の切り替え・矢印の切り替え・注記の有無ではカードも線も動かない。
+  見せ方は docs/specs/frontier-canvas.md（設計書）で決めた。見方は3つ：a 全体を掴む（既定）、b 次に直す、c 移行。
+  配置（役割の行 × 段の列）と線の割り当ては、すべての段階のノードとすべての種類の辺を合わせて1回だけ決め、
+  見方・段階・選び・注記を切り替えても、カードも線も動かない（出す・隠すだけ）。
   ほかの道具の注記は、2つめの script（id="overlay"）の中身を同じやり方で置き換えて重ねる（形は SKILL.md の進め方の4）。
   要素には data-node-id・data-edge-id・data-check-id・data-role-id・data-stage-id を付ける。
 -->
 <script id="design" type="application/json">/*DESIGN*/null</script>
 <script id="overlay" type="application/json">/*OVERLAY*/null</script>
 <style>
-  :root {
-    --bg: #f6f7f9; --panel: #ffffff; --ink: #1f2430; --sub: #5b6475; --line: #d9dde5;
-    --lane-a: #ffffff; --lane-b: #f9fafc; --upstream: #7c3aed; --upstream-tint: rgba(124,58,237,.06);
-    --task: #0f766e; --plan: #2563eb; --run: #059669; --human: #6b7280; --gap: #dc2626;
-    --edge: #8a93a6; --sel: #f59e0b;
-  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
-  body { display: flex; flex-direction: column; }
-  header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  header h1 { font-size: 16px; margin: 0; }
-  header .repo { color: var(--sub); font-size: 13px; }
-  nav { display: flex; gap: 4px; margin-left: 8px; }
-  nav button { border: 1px solid var(--line); background: var(--panel); padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--ink); }
-  nav button[aria-selected="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
-  nav button .count { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 9px; background: var(--gap); color: #fff; font-size: 11px; }
-  .legend { display: flex; gap: 10px; margin-left: auto; font-size: 12px; color: var(--sub); flex-wrap: wrap; align-items: center; }
-  .legend span { display: inline-flex; align-items: center; gap: 4px; }
-  main { flex: 1; position: relative; min-height: 0; }
-  section { position: absolute; inset: 0; overflow: auto; }
-  section[hidden] { display: none; }
+  html, body { margin: 0; height: 100%; background: #fbfaf7; color: #2b2a28; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  button { font: inherit; color: inherit; }
 
-  #viewport { position: absolute; inset: 0; overflow: hidden; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; background-image: radial-gradient(#d4d8e0 1px, transparent 1px); background-size: 20px 20px; }
-  #viewport.dragging { cursor: grabbing; }
-  #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-  #edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
-  .lane { position: absolute; border-bottom: 1px solid var(--line); }
-  .lane-head { position: absolute; padding: 12px; font-size: 13px; border-right: 1px solid var(--line); background: var(--panel); }
-  .lane-head b { display: block; font-size: 14px; }
-  .lane-head .decides { display: inline-block; margin-top: 6px; font-size: 11px; color: #fff; background: var(--upstream); padding: 1px 7px; border-radius: 9px; }
-  .col-head { position: absolute; height: 44px; display: flex; align-items: center; justify-content: center; flex-direction: column; font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--line); background: var(--panel); }
-  .col-head small { font-weight: 400; color: var(--upstream); font-size: 11px; }
-  .col-tint { position: absolute; background: var(--upstream-tint); }
+  /* 見方の切り替え（右上）と表 */
+  #top { position: fixed; top: 18px; right: 24px; display: flex; align-items: center; gap: 16px; font-size: 13px; z-index: 5; }
+  #views { display: flex; gap: 18px; }
+  #views button, #tableBtn { border: 0; background: none; padding: 4px 0; cursor: pointer; color: #857f76; border-bottom: 2px solid transparent; }
+  #views button[aria-selected="true"] { color: #2b2a28; font-weight: 600; border-bottom-color: #2b2a28; }
+  body[data-table] #views button[aria-selected="true"] { font-weight: 400; border-bottom-color: transparent; color: #5d5850; }
+  #tableBtn[aria-pressed="true"] { color: #2b2a28; font-weight: 600; border-bottom-color: #2b2a28; }
+  #top .sep { width: 1px; height: 14px; background: #d8d1c5; }
+  #top button:focus-visible, #panel :focus-visible, #tip :focus-visible, #table :focus-visible { outline: 2px solid #2b2a28; outline-offset: 2px; border-radius: 3px; }
 
-  .node { position: absolute; width: 184px; background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--task); border-radius: 10px; padding: 7px 9px 8px; font-size: 12px; box-shadow: 0 1px 3px rgba(20,30,50,.08); cursor: pointer; user-select: none; }
-  .node.upstream { border-left-color: var(--upstream); }
-  .node.gap { border: 2px dashed var(--gap); border-left-width: 5px; }
-  .node.selected { box-shadow: 0 0 0 3px var(--sel); }
-  .node.off { visibility: hidden; }
-  .node .top { display: flex; align-items: center; gap: 4px; }
-  .node .kind { font-size: 11px; color: var(--sub); white-space: nowrap; margin-right: auto; }
-  .node .kind b { font-size: 13px; color: var(--ink); margin-right: 2px; }
-  .node .title { font-size: 14px; font-weight: 700; margin: 4px 0 2px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .node .skills { font-size: 11px; color: var(--sub); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .node .row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
-  .chip.gapflag::before { content: "⚠ "; }
-  .chip.phase-new { background: #e0f2fe; color: #075985; }
-  .chip.phase-end { background: #f1f5f9; color: #475569; text-decoration: line-through; }
-  .checks-btn { border: 1px solid var(--line); background: #f8fafc; border-radius: 9px; padding: 0 7px; font-size: 11px; line-height: 18px; cursor: pointer; color: var(--ink); display: inline-flex; align-items: center; gap: 3px; }
-  .checks-btn i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
-  .checks-pop { position: absolute; z-index: 6; width: 280px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 20px rgba(20,30,50,.18); padding: 8px 10px; font-size: 12px; cursor: default; }
-  .checks-pop[hidden] { display: none; }
-  .checks-pop h3, #detail h3 { font-size: 12px; margin: 0 0 4px; color: var(--sub); font-weight: 600; }
-  ol.checks { list-style: none; margin: 0; padding: 0; }
-  ol.checks li { padding: 5px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr; gap: 2px 6px; align-items: start; position: relative; }
-  .checks-pop .pop-foot { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); color: var(--sub); font-size: 11px; line-height: 1.45; }
-  ol.checks li:first-child { border-top: none; }
-  ol.checks li b { font-size: 12px; }
-  ol.checks li .sub { grid-column: 2; color: var(--sub); font-size: 11px; line-height: 1.45; }
-  ol.checks li.gap b { color: var(--gap); }
-  .mark { position: absolute; z-index: 4; top: -10px; right: -8px; max-width: 150px; padding: 0 7px; border-radius: 9px; font-size: 11px; line-height: 18px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
-  .mark.inline { position: static; display: inline-block; box-shadow: none; }
-  .mark.info { background: #0284c7; } .mark.warn { background: #d97706; } .mark.error { background: #dc2626; } .mark.muted { background: #64748b; }
-  .node.marked-muted { opacity: .45; }
-  .node .mark.phase { position: absolute; top: -10px; left: 10px; right: auto; z-index: 4; }
-  .node .mark.phase.new { background: #0369a1; } .node .mark.phase.end { background: #64748b; } .node .mark.phase.chg { background: #7c3aed; }
-  path.edge.mark-info { stroke: #0284c7; stroke-opacity: 1; } path.edge.mark-warn { stroke: #d97706; stroke-opacity: 1; } path.edge.mark-error { stroke: #dc2626; stroke-opacity: 1; } path.edge.mark-muted { stroke-opacity: .2; }
-  .edge-mark rect { rx: 8; } .edge-mark text { font-size: 11px; fill: #fff; }
-  .edge-mark.info rect { fill: #0284c7; } .edge-mark.warn rect { fill: #d97706; } .edge-mark.error rect { fill: #dc2626; } .edge-mark.muted rect { fill: #64748b; }
-  .lane-head .actor { display: inline-block; margin-top: 4px; margin-right: 4px; font-size: 11px; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--line); background: #f8fafc; }
-  .lane-head .actor.agent { border-color: var(--run); color: var(--run); }
-  .lane-head .actor.auto { border-color: var(--human); color: var(--human); }
-  .phases { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--sub); }
-  .phases button { border: 1px solid var(--line); background: var(--panel); padding: 3px 9px; font-size: 12px; cursor: pointer; color: var(--ink); }
-  .phases button:first-of-type { border-radius: 6px 0 0 6px; } .phases button:last-of-type { border-radius: 0 6px 6px 0; }
-  .phases button[aria-pressed="true"] { background: #0369a1; color: #fff; border-color: #0369a1; }
-  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 9px; font-size: 11px; line-height: 18px; white-space: nowrap; }
-  .chip.session-plan { background: var(--plan); color: #fff; }
-  .chip.session-run { background: var(--run); color: #fff; }
-  .chip.session-human { background: var(--human); color: #fff; }
-  .chip.unknown { background: #fee2e2; color: var(--gap); }
-  .chip.layer-upstream { border: 1px solid var(--upstream); color: var(--upstream); }
-  .chip.layer-task { border: 1px solid var(--task); color: var(--task); }
-  .chip.skill { background: #eef1f6; color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .chip.gapflag { background: var(--gap); color: #fff; }
-  .tool { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px 1px 6px; border-radius: 9px; font-size: 11px; line-height: 18px; border: 1px solid; white-space: nowrap; }
-  .tool i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .node.gate { border-radius: 2px 18px 2px 18px; }
-  .chip.risk-narrow { background: #dcfce7; color: #166534; }
-  .chip.risk-wide { background: #fef3c7; color: #92400e; }
-  .chip.risk-irreversible { background: #fee2e2; color: #991b1b; font-weight: 600; }
-  .chip.humanflag { background: var(--ink); color: #fff; }
-  .edge-label { font-size: 11px; fill: var(--sub); }
-  .edge-label-bg { fill: var(--bg); }
-  path.edge { fill: none; stroke: var(--edge); stroke-width: 1.6; stroke-opacity: .55; }
-  path.edge.fix, path.edge.learn, path.edge.hl { stroke-opacity: 1; }
-  path.edge.back { stroke-dasharray: 6 4; }
-  path.edge.fix { stroke: #ea580c; stroke-dasharray: 5 4; }
-  path.edge.learn { stroke: var(--upstream); stroke-dasharray: 2 4; stroke-width: 2.2; }
-  .legend .toggles label { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; cursor: pointer; }
-  .legend .ln { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--edge); vertical-align: middle; }
-  .legend .ln.fix { border-top: 2px dashed #ea580c; }
-  .legend .ln.learn { border-top: 2px dotted var(--upstream); }
-  path.edge.hl { stroke: var(--sel); stroke-width: 2.6; }
+  /* 図 */
+  #wrap { position: fixed; inset: 0; }
+  body[data-view="b"] #wrap, body[data-view="c"] #wrap { right: 270px; }
+  body[data-fold][data-view="b"] #wrap, body[data-fold][data-view="c"] #wrap { right: 34px; }
+  #v { width: 100%; height: 100%; display: block; }
+  .card { cursor: pointer; }
+  .card:focus { outline: none; }
+  .card .focus { display: none; }
+  .card:focus-visible .focus { display: inline; }
+  .empty { padding: 60px 40px; color: #5d5850; font-size: 14px; }
 
-  #detail { position: absolute; right: 12px; top: 12px; width: 300px; max-height: calc(100% - 24px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; font-size: 13px; box-shadow: 0 4px 16px rgba(20,30,50,.12); }
-  #detail[hidden] { display: none; }
-  #detail h2 { font-size: 15px; margin: 0 24px 8px 0; }
-  #detail dl { margin: 0; }
-  #detail dt { color: var(--sub); font-size: 11px; margin-top: 9px; }
-  #detail dd { margin: 2px 0 0; display: flex; flex-wrap: wrap; gap: 4px; }
-  #detail .close { position: absolute; right: 10px; top: 8px; border: none; background: none; font-size: 18px; cursor: pointer; color: var(--sub); }
-  #detail .gaptext { color: var(--gap); }
-  .zoom { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 4px; align-items: center; }
-  .zoom button { width: 34px; height: 30px; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; cursor: pointer; font-size: 14px; }
-  .zoom button.wide { width: auto; padding: 0 10px; font-size: 12px; }
-  .zoom .hint { margin-left: 8px; padding: 4px 8px; font-size: 12px; color: var(--sub); background: rgba(255,255,255,.9); border: 1px solid var(--line); border-radius: 6px; }
+  /* 横の一覧（b・c） */
+  #panel { position: fixed; top: 0; right: 0; bottom: 0; width: 270px; padding: 62px 16px 20px; background: #f6f3ee; border-left: 1px solid #e3ded5; overflow: auto; font-size: 12.5px; line-height: 1.6; display: none; }
+  body[data-view="b"] #panel, body[data-view="c"] #panel { display: block; }
+  body[data-fold] #panel { width: 34px; padding: 62px 0 0; overflow: hidden; }
+  body[data-fold] #panel > :not(#fold) { display: none; }
+  #fold { display: none; margin: 0 0 6px auto; border: 1px solid #d8d1c5; background: #fff; border-radius: 6px; padding: 1px 8px; font-size: 11.5px; color: #5d5850; cursor: pointer; }
+  body[data-narrow] #fold { display: block; }
+  body[data-fold] #fold { writing-mode: vertical-rl; margin: 0 auto; padding: 8px 2px; }
+  #panel h2 { font-size: 13px; margin: 6px 0 4px; color: #3d3b38; }
+  #panel .sub { color: #857f76; margin: 0 0 10px; }
+  [role="listbox"] { margin: 0 0 12px; outline: none; }
+  [role="option"] { cursor: pointer; }
+  .tier { color: #857f76; font-size: 11px; letter-spacing: .08em; margin: 12px 0 4px; }
+  .g { background: #fff; border: 1px solid #e6e1d8; border-radius: 8px; padding: 7px 10px; margin-bottom: 6px; }
+  .g b { display: block; font-size: 13px; }
+  .g span { color: #5d5850; }
+  .g.first { border-color: #c23a22; }
+  .g.first b::after { content: "　次に直す"; color: #c23a22; font-size: 11px; font-weight: 600; }
+  .g[aria-selected="true"], .d[aria-selected="true"] { box-shadow: 0 0 0 1.5px #4a4642; }
+  .ph { padding: 7px 10px; border-radius: 8px; margin-bottom: 4px; border: 1px solid transparent; }
+  .ph[aria-selected="true"] { background: #fff; border-color: #d8d1c5; }
+  .ph b { font-size: 13px; display: block; }
+  .ph .n { display: block; color: #857f76; font-size: 11.5px; }
+  .ph small { display: block; color: #5d5850; }
+  .d { background: #fff; border: 1px solid #e6e1d8; border-radius: 8px; padding: 7px 10px; margin-bottom: 6px; }
+  .d b { display: inline-block; min-width: 6.6em; font-size: 12px; }
+  .d span { color: #3d3b38; }
 
-  .doc { padding: 20px 24px; max-width: 1200px; }
-  table { border-collapse: collapse; width: 100%; background: var(--panel); font-size: 13px; }
-  th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
-  th { background: #eef1f6; font-weight: 600; }
-  tr.gaprow td { background: #fff5f5; }
-  td .row { display: flex; flex-wrap: wrap; gap: 4px; }
-  pre.ticket { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
-  ul.gaps li { margin: 6px 0; }
-  .empty { padding: 40px; color: var(--sub); }
+  /* 詳細の窓（popover。モーダルにしない） */
+  #tip { position: fixed; width: 350px; padding: 12px 14px; font-size: 12px; line-height: 1.65; background: #fff; border: 1px solid #e3ded5; border-radius: 10px; box-shadow: 0 2px 8px rgba(90,74,48,.10); z-index: 6; }
+  #tip[hidden] { display: none; }
+  #tip h2 { font-size: 14px; margin: 0 26px 6px 0; }
+  #tip .x { position: absolute; right: 8px; top: 6px; border: 0; background: none; font-size: 16px; color: #857f76; cursor: pointer; padding: 0 4px; }
+  #tip .r > span:first-child { display: inline-block; width: 6.4em; color: #857f76; vertical-align: top; }
+  #tip.dock { column-width: 250px; column-gap: 24px; font-size: 11.5px; line-height: 1.55; padding: 10px 14px; overflow: auto; box-shadow: none; }
+  #tip.dock h2 { column-span: all; }
+  #tip.dock .r, #tip.dock li { break-inside: avoid; }
+  #tip ul { list-style: none; padding: 0; margin: 4px 0 0; }
+  #tip li { margin: 0 0 6px; padding-left: 14px; position: relative; }
+  #tip li i { position: absolute; left: 0; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: #b8b0a3; }
+  #tip li i.hum { background: #b0713f; }
+  #tip li i.gap { background: #fff; border: 1.4px solid #5d5850; }
+  #tip li i.gap1 { background: #c23a22; }
+  #tip li b { margin-right: 6px; }
+  #tip li em { font-style: normal; color: #857f76; margin-right: 6px; }
+  #tip li strong { display: block; font-weight: 600; color: #3d3b38; }
+  #tip li strong.first { color: #c23a22; }
+  #tip li[aria-current="true"] { background: #f6f3ee; border-radius: 4px; }
+
+  /* 表（見方とは別の、全文を読む・探す・印刷する所） */
+  #table { position: fixed; inset: 0; overflow: auto; padding: 64px 28px 28px; background: #fbfaf7; font-size: 12.5px; line-height: 1.55; }
+  #table[hidden] { display: none; }
+  #table h2 { font-size: 15px; margin: 0 0 10px; color: #3d3b38; }
+  #table h3 { font-size: 13px; margin: 22px 0 8px; color: #3d3b38; }
+  #table table { border-collapse: collapse; width: 100%; background: #fff; }
+  #table th, #table td { border: 1px solid #e3ded5; padding: 6px 8px; text-align: left; vertical-align: top; }
+  #table th { background: #f3f0eb; font-weight: 600; white-space: nowrap; }
+  #table td:nth-child(-n+2) { white-space: nowrap; }
+  #table code { font-family: "SF Mono", Menlo, monospace; font-size: 11.5px; }
+  #table ol { margin: 4px 0 0; padding-left: 18px; color: #5d5850; }
+  @media print { #top { display: none; } #table { position: static; padding: 0; } }
 </style>
 </head>
-<body>
-<header>
-  <h1 id="teamName">frontier team の流れ</h1>
-  <span class="repo" id="repoName"></span>
-  <nav role="tablist">
-    <button data-tab="canvasView" aria-selected="true">キャンバス</button>
-    <button data-tab="tableView" aria-selected="false">表</button>
-    <button data-tab="ticketView" aria-selected="false">チケットの雛形</button>
-    <button data-tab="gapView" aria-selected="false">足りないもの<span class="count" id="gapCount" hidden></span></button>
-    <button data-tab="markView" aria-selected="false" hidden id="markTab">注記</button>
-  </nav>
-  <span class="phases" id="phases" hidden></span>
-  <div class="legend">
-    <span><span class="chip session-plan">計画</span><span class="chip session-run">実行</span><span class="chip session-human">人</span><span class="chip session-human">自動</span>誰が動かすか</span>
-    <span><span class="chip layer-upstream">上流</span><span class="chip layer-task">タスク</span>カードの左の線（紫・緑）</span>
-    <span><span class="chip risk-narrow">戻せて狭い</span><span class="chip risk-wide">戻せるが広い</span><span class="chip risk-irreversible">戻せない</span>関門</span>
-    <span><span class="chip humanflag">人</span>人を置く関門</span>
-    <span class="toggles">矢印：<label><input type="checkbox" data-edge="data" checked><i class="ln"></i>データ</label><label><input type="checkbox" data-edge="fix" checked><i class="ln fix"></i>直し</label><label><input type="checkbox" data-edge="learn"><i class="ln learn"></i>学び</label><label><input type="checkbox" id="edgeNames">名前</label></span>
-    <span><span class="chip gapflag">スキル無し</span>足りないもの（破線の枠）</span>
+<body data-view="a">
+<nav id="top" aria-label="見方">
+  <div role="tablist" id="views" aria-label="見方">
+    <button type="button" role="tab" id="tab-a" data-v="a" aria-controls="wrap">全体を掴む</button>
+    <button type="button" role="tab" id="tab-b" data-v="b" aria-controls="wrap">次に直す</button>
+    <button type="button" role="tab" id="tab-c" data-v="c" aria-controls="wrap">移行</button>
   </div>
-</header>
-<main>
-  <section id="canvasView">
-    <div id="viewport"><div id="world"><svg id="edges"></svg></div></div>
-    <aside id="detail" hidden></aside>
-    <div class="zoom">
-      <button id="zoomIn" title="拡大（+）" aria-label="拡大">＋</button>
-      <button id="zoomOut" title="縮小（-）" aria-label="縮小">－</button>
-      <button id="zoomFit" class="wide" title="全体を表示（0）">全体</button>
-      <span class="hint">ドラッグ・スクロールで移動 ／ ピンチ・⌘か Ctrl＋スクロールで拡大縮小 ／ キー：＋ − 0（全体）矢印 ／ ノードをクリックで詳細</span>
-    </div>
-  </section>
-  <section id="tableView" hidden><div class="doc" id="tableDoc"></div></section>
-  <section id="ticketView" hidden><div class="doc" id="ticketDoc"></div></section>
-  <section id="gapView" hidden><div class="doc" id="gapDoc"></div></section>
-  <section id="markView" hidden><div class="doc" id="markDoc"></div></section>
-</main>
+  <span class="sep" aria-hidden="true"></span>
+  <button type="button" id="tableBtn" aria-pressed="false" aria-controls="table">表</button>
+</nav>
+<h1 class="sr" id="headline"></h1>
+<div id="live" class="sr" aria-live="polite"></div>
+<main id="wrap" role="tabpanel"></main>
+<aside id="panel" aria-label="一覧"></aside>
+<div id="tip" role="dialog" aria-modal="false" aria-labelledby="tipTitle" hidden></div>
+<section id="table" aria-label="表" hidden></section>
 <script>
 (() => {
   "use strict";
+  // ---- 小さな道具 ----
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
+  const sv = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]); if (parent) parent.append(e); return e; };
+  const tx = (parent, x, y, text, attrs = {}) => { const t = sv("text", Object.assign({ x, y }, attrs), parent); t.textContent = text; return t; };
+  const str = (v, d = "") => (v == null ? d : String(v));
+  const arr = (v) => (Array.isArray(v) ? v : v == null || v === "" ? [] : [v]);
+  const uniq = (a) => [...new Set(a)];
+  const groupBy = (list, key) => { const m = new Map(); list.forEach((x) => { const k = key(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); }); return m; };
+
+  // ---- 色と書体（設計書の「地と色」） ----
+  const INK = "#2b2a28", HEADC = "#3d3b38", SUB = "#857f76", RULE = "#e3ded5", ALT = "#f3f0eb", BG = "#fbfaf7", GAPINK = "#5d5850";
+  const HUM = "#b0713f", HUMBG = "#f5eadf", HUMTX = "#87512a"; // 人の関わり：彩度を抑えたアンバー
+  const AGBG = "#e9eef5", AGTX = "#46607e";                     // エージェント：彩度を抑えた青
+  const RED = "#c23a22";                                         // 赤は b の 1 位だけ
+  const GOTH = '"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif', MONO = '"SF Mono",Menlo,monospace';
+
+  const wrap = document.getElementById("wrap");
+  // ---- 読み込み ----
+  const raw = document.getElementById("design").textContent.trim();
+  let D = null, parseError = null;
+  if (!raw.startsWith("/*DESIGN*/")) { try { D = JSON.parse(raw); } catch (e) { parseError = e.message; } }
+  if (!D || typeof D !== "object") {
+    wrap.replaceChildren(el("div", "empty", parseError ? "設計の JSON を読めませんでした：" + parseError
+      : "設計の JSON が埋め込まれていません。id=\"design\" の script の中身を JSON に置き換えてください。"));
+    document.getElementById("top").hidden = true;
+    return;
+  }
+
+  // ---- ととのえる（欠けたものは足りないものとして残す） ----
   const DEFAULT_STAGES = [
     { id: "intent", name: "要求・原則" }, { id: "spec", name: "仕様" }, { id: "tickets", name: "チケット" },
     { id: "plan", name: "計画（依頼）" }, { id: "run", name: "実行" }, { id: "pr", name: "PR" },
     { id: "verify", name: "検証" }, { id: "eval", name: "評価" },
   ];
   const SESSION = { plan: "計画", run: "実行", human: "人" };
-  const KIND_IC = { split: ["⑂", "分ける"], work: ["▶", "実行"], code: ["{ }", "コード"], gate: ["◇", "関門"] };
-  const KIND = Object.fromEntries(Object.entries(KIND_IC).map(([k, [i, t]]) => [k, i + " " + t]));
-  const RISK = { narrow: "戻せて狭い", wide: "戻せるが広い", irreversible: "戻せない" };
+  const KIND = { split: "分ける", work: "作業", code: "コード", gate: "関門" };
+  const RISK = { irreversible: "戻せない", wide: "戻せるが広い", narrow: "戻せて狭い" };
+  const RISKS = { irreversible: "戻せない", wide: "広い", narrow: "狭い" };
+  const RR = { irreversible: 0, wide: 1, narrow: 2 };
   const EDGE_KIND = { data: "データ", fix: "直し", learn: "学び" };
-  const LAYER = { upstream: "上流", task: "タスク" };
-  const PALETTE = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#16a34a", "#0891b2", "#4f46e5", "#ca8a04", "#475569"];
-
-  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
-  const str = (v, d = "") => (v == null ? d : String(v));
-  const arr = (v) => (Array.isArray(v) ? v : v == null || v === "" ? [] : [v]);
-  const hashColor = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.codePointAt(0)) >>> 0; return PALETTE[h % PALETTE.length]; };
-  const safeColor = (c, key) => (/^#[0-9a-f]{3,8}$/i.test(str(c)) ? c : hashColor(key));
-
-  // ---- 読み込み ----
-  const raw = document.getElementById("design").textContent.trim();
-  let D = null, parseError = null;
-  if (!raw.startsWith("/*DESIGN*/")) { try { D = JSON.parse(raw); } catch (e) { parseError = e.message; } }
-  if (!D || typeof D !== "object") {
-    document.getElementById("canvasView").replaceChildren(el("div", "empty",
-      parseError ? "設計の JSON を読めませんでした：" + parseError
-                 : "設計の JSON が埋め込まれていません。id=\"design\" の script の中身を JSON に置き換えてください。"));
-    return;
-  }
-
-  // ---- ととのえる（欠けたものは足りないものとして残す） ----
+  const GROUP = { input: "入力", routing: "振り分け", candidate: "候補", output: "出力" };
+  const INVL = { human: "人", cond: "条件で人", agent: "エージェント", auto: "自動" };
   const problems = [];
-  const stages = arr(D.stages).length ? arr(D.stages).map((s, i) => ({ id: str(s && s.id, "stage" + i), name: str(s && (s.name || s.id), "段" + (i + 1)) })) : DEFAULT_STAGES.slice();
-  const ACTOR = { human: "人", agent: "エージェント", auto: "自動" };
-  const roles = arr(D.roles).map((r, i) => ({ id: str(r && r.id, "role" + i), name: str(r && (r.name || r.id), "役割" + (i + 1)), people: r && r.people, actor: str(r && r.actor), decides: !!(r && r.decides), note: str(r && r.note) }));
-  // 移行の段階。順のある配列。ノードと辺の since（その段階から在る）・until（その段階から無い）で、段階ごとに出すものを決める。
-  const phases = arr(D.phases).map((p, i) => ({ id: str(p && p.id, "phase" + i), name: str(p && (p.name || p.id), "段階" + (i + 1)), note: str(p && p.note) }));
+
+  const stages = arr(D.stages).length
+    ? arr(D.stages).map((s, i) => ({ id: str(s && s.id, "stage" + i), name: str(s && (s.name || s.id), "段" + (i + 1)), group: GROUP[str(s && s.group)] ? s.group : "" }))
+    : DEFAULT_STAGES.map((s) => Object.assign({ group: "" }, s));
+  const roles = arr(D.roles).map((r, i) => ({ id: str(r && r.id, "role" + i), name: str(r && (r.name || r.id), "役割" + (i + 1)), people: r && r.people, actor: str(r && r.actor), decides: !!(r && r.decides) }));
+  // 移行の段階。順のある配列。ノード・辺・検査の since（その段階から在る）・until（その段階から無い）で、段階ごとに出すものを決める。
+  const phases = arr(D.phases).map((p, i) => ({ id: str(p && p.id, "phase" + i), name: str(p && (p.name || p.id), "段階" + (i + 1)), note: str(p && p.note), current: !!(p && p.current === true) }));
   const phaseIx = new Map(phases.map((p, i) => [p.id, i]));
+  const NP = Math.max(1, phases.length);
   const lifeOf = (o, what) => {
     const since = str(o.since), until = str(o.until);
     if (since && !phaseIx.has(since)) problems.push(`${what}の since「${since}」が phases に無い`);
     if (until && !phaseIx.has(until)) problems.push(`${what}の until「${until}」が phases に無い`);
     return { since: phaseIx.has(since) ? since : "", until: phaseIx.has(until) ? until : "" };
   };
-  const aliveAt = (o, p) => p < 0 || ((!o.since || phaseIx.get(o.since) <= p) && (!o.until || phaseIx.get(o.until) > p));
-  // 足りないもの（gap）は、文か、段階を付けた {text, since, until}（その配列も可）。段階を付けたものは、その段階の図でだけ数える。
-  const gapsOf = (v, what) => arr(v).map((g) => g && typeof g === "object" ? Object.assign({ text: str(g.text) }, lifeOf(g, what + "の gap")) : { text: str(g), since: "", until: "" }).filter((g) => g.text);
-  const gapAt = (o, p) => o.gaps.filter((g) => aliveAt(g, p)).map((g) => g.text).join("／");
-  // カードには短い名前（short）を出す。無ければ題名から括弧の中を除いたもの。題名の全文は詳細に出す。
+  const aliveAt = (o, p) => (!o.since || phaseIx.get(o.since) <= p) && (!o.until || phaseIx.get(o.until) > p);
+  // gap と human_if は、文か、段階を付けた {text, since, until}（その配列も可）。段階を付けたものは、その段階でだけ在る。
+  const textsOf = (v, what) => arr(v).map((g) => g && typeof g === "object" ? Object.assign({ text: str(g.text) }, lifeOf(g, what)) : { text: str(g), since: "", until: "" }).filter((g) => g.text);
+  const textAt = (list, p) => list.filter((g) => aliveAt(g, p)).map((g) => g.text).join("／");
   const shortTitle = (t) => { const s = t.replace(/[（(][^（）()]*[）)]/g, "").replace(/\s+/g, " ").trim(); return s || t; };
-  const tools = new Map();
-  arr(D.tools).forEach((t, i) => { const id = str(t && t.id, "tool" + i); tools.set(id, { id, name: str(t && (t.name || t.id), id), color: safeColor(t && t.color, id) }); });
-  const toolOf = (id) => { if (!tools.has(id)) tools.set(id, { id, name: id, color: hashColor(id) }); return tools.get(id); };
+  const toolName = new Map(arr(D.tools).map((t, i) => [str(t && t.id, "tool" + i), str(t && (t.name || t.id), "tool" + i)]));
 
   const stageIx = new Map(stages.map((s, i) => [s.id, i]));
   const roleIx = new Map(roles.map((r, i) => [r.id, i]));
@@ -246,24 +198,22 @@
     const node = {
       id: str(n.id, "n" + i), title: str(n.title || n.name, "（名前なし）"), stage: str(n.stage), role: str(n.role),
       skills: arr(n.skills).map(String), session: str(n.session), layer: str(n.layer, "task"), tools: arr(n.tools).map(String),
-      output: str(n.output), note: str(n.note),
-      kind: str(n.kind), risk: str(n.risk), human: n.human === true, check: str(n.check), short: str(n.short),
+      output: str(n.output), kind: str(n.kind), risk: str(n.risk), human: n.human === true, check: str(n.check), short: str(n.short),
     };
     Object.assign(node, lifeOf(n, `ノード「${node.title}」`));
-    node.gaps = gapsOf(n.gap, `ノード「${node.title}」`);
+    node.gaps = textsOf(n.gap, `ノード「${node.title}」の gap`);
+    node.conds = textsOf(n.human_if, `ノード「${node.title}」の human_if`);
     node.card = node.short || shortTitle(node.title);
-    // 関門の中の検査。ノードと同じキー（title・session・check・skills・tools・gap・since・until）の小さな形。session を省くと自動。
-    // 段階で検査が増えたり減ったりしても、検査の ID（id、無ければ全体の並びの番号）は変わらない。
+    // 関門の中の検査。段階で検査が増えたり減ったりしても、検査の ID（id、無ければ並びの番号）は変わらない。
     node.checks = arr(n.checks).map((c, j) => {
       c = c && typeof c === "object" ? c : { title: str(c) };
-      const ck = { id: str(c.id, String(j + 1)), title: str(c.title || c.name, "（名前なし）"), session: str(c.session), check: str(c.check),
-        skills: arr(c.skills).map(String), tools: arr(c.tools).map(String) };
+      const ck = { id: str(c.id, String(j + 1)), title: str(c.title || c.name, "（名前なし）"), session: str(c.session), check: str(c.check), skills: arr(c.skills).map(String), tools: arr(c.tools).map(String) };
       Object.assign(ck, lifeOf(c, `検査「${node.title}／${ck.title}」`));
-      ck.gaps = gapsOf(c.gap, `検査「${node.title}／${ck.title}」`);
-      ck.key = node.id + "/" + ck.id; ck.auto = !SESSION[ck.session]; ck.tools.forEach(toolOf);
+      ck.gaps = textsOf(c.gap, `検査「${node.title}／${ck.title}」の gap`);
+      ck.key = node.id + "/" + ck.id;
       return ck;
     });
-    if (!stageIx.has(node.stage)) { const id = node.stage || "_nostage"; if (!stageIx.has(id)) { stageIx.set(id, stages.length); stages.push({ id, name: node.stage || "（段なし）" }); } node.stage = id; }
+    if (!stageIx.has(node.stage)) { const id = node.stage || "_nostage"; if (!stageIx.has(id)) { stageIx.set(id, stages.length); stages.push({ id, name: node.stage || "（段なし）", group: "" }); } node.stage = id; }
     if (!roleIx.has(node.role)) { const id = node.role || "_norole"; if (!roleIx.has(id)) { roleIx.set(id, roles.length); roles.push({ id, name: node.role || "（役割なし）", missing: true }); } node.role = id; }
     node.missing = [];
     node.auto = !SESSION[node.session] && (node.kind === "code" || node.kind === "gate");
@@ -271,27 +221,12 @@
     if (!SESSION[node.session] && !node.auto && roles[roleIx.get(node.role)].actor === "human") node.session = "human";
     if (!SESSION[node.session] && !node.auto) node.missing.push("セッション");
     if (roles[roleIx.get(node.role)].missing) node.missing.push("役割");
-    // 人が動かす作業とコードは、スキルが無くても足りないものにしない（印も「スキル無し」にしない）。
-    // エージェントのセッション（計画・実行）の作業は、スキルが無ければ足りない。自動の関門は、gap に書いたときだけ足りない。
-    node.skillless = node.skills.length === 0 && node.session !== "human" && node.kind !== "code";
-    node.wantsSkill = node.skillless && (node.session === "plan" || node.session === "run");
-    node.tools.forEach(toolOf);
+    // 人が動かす作業とコードは、スキルが無くても足りないものにしない。エージェントのセッション（計画・実行）の作業は、スキルが無ければ足りない。
+    node.wantsSkill = node.skills.length === 0 && (node.session === "plan" || node.session === "run") && node.kind !== "code";
     return node;
   });
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  // 段階 p でのノードの足りないもの（p が -1 なら全部を重ねる）。カード・詳細・「足りないもの」のタブは、どれもここから読む。
-  const stateAt = (n, p) => {
-    const checks = n.checks.filter((c) => aliveAt(c, p));
-    const gap = gapAt(n, p);
-    // 中の検査があるときは、足りないかを検査ごとに見る（ノードのスキルの有無では決めない）。
-    const noSkill = n.wantsSkill && !checks.length;
-    const checkGaps = checks.filter((c) => gapAt(c, p)).length;
-    const isGap = !!gap || n.missing.length > 0 || noSkill || checkGaps > 0;
-    // カードに出す、何が足りないかの短い印。理由の文章（gap）は詳細に出す。
-    const tags = n.missing.map((m) => m + "不明").concat(noSkill ? ["スキル無し"] : [], checkGaps ? [`足りない検査 ${checkGaps}`] : []);
-    if (isGap && !tags.length) tags.push(n.skillless && !checks.length ? "スキル無し" : "足りない");
-    return { checks, gap, isGap, tags };
-  };
+  const checkByKey = new Map(); nodes.forEach((n) => n.checks.forEach((c) => checkByKey.set(c.key, c)));
   const edges = [];
   const edgeIds = new Set();
   arr(D.edges).forEach((e, i) => {
@@ -303,546 +238,878 @@
     const base = str(e.id) || `${from}>${to}:${kind}`;
     let id = base; for (let k = 2; edgeIds.has(id); k++) id = base + "#" + k;
     edgeIds.add(id);
-    const edge = { id, from, to, label: str(e.label), kind };
-    Object.assign(edge, lifeOf(e, `矢印「${id}」`));
-    edges.push(edge);
+    edges.push(Object.assign({ id, i: edges.length, from, to, label: str(e.label), kind }, lifeOf(e, `矢印「${id}」`)));
   });
+  const edgeById = new Map(edges.map((e) => [e.id, e]));
+  // きっかけ：誰が・何で流れを始めるか。行き先のノードが選んだ段階に無ければ出さない。
+  const TRIG = { human: 1, schedule: 1, event: 1 };
+  const triggers = arr(D.triggers).map((t, i) => {
+    t = t && typeof t === "object" ? t : {};
+    const to = str(t.to), by = str(t.by);
+    if (!byId.has(to)) { problems.push(`きっかけ ${i + 1} の行き先のノード「${to}」が無い`); return null; }
+    if (!TRIG[by]) problems.push(`きっかけ ${i + 1} の by「${by}」が human・schedule・event のどれでもない`);
+    return { to, by: TRIG[by] ? by : "event", role: str(t.role), label: str(t.label) };
+  }).filter(Boolean);
 
-  document.getElementById("teamName").textContent = str(D.team, "frontier team") + " の流れ";
-  document.getElementById("repoName").textContent = str(D.repo);
-  document.title = str(D.team, "frontier team") + " の流れ";
+  const team = str(D.team, "frontier team"), repo = str(D.repo);
+  const teamLine = team + (repo ? "（" + repo + "）" : "");
+  document.title = team + " の流れ";
+  const stName = (id) => stages[stageIx.get(id)].name;
+  const roName = (id) => roles[roleIx.get(id)].name;
+  const phName = (p) => (phases.length ? phases[p].name : "");
+  const short = (id) => byId.get(id).card;
 
-  // ---- 部品 ----
-  const sessionChip = (s, auto) => auto ? el("span", "chip session-human", "自動") : SESSION[s] ? el("span", "chip session-" + s, SESSION[s]) : el("span", "chip unknown", "セッション不明");
-  const riskChip = (r) => RISK[r] ? el("span", "chip risk-" + r, RISK[r]) : el("span", "chip unknown", "戻しにくさ不明");
-  const layerChip = (l) => el("span", "chip layer-" + (l === "upstream" ? "upstream" : "task"), LAYER[l] || l || "タスク");
-  const toolBadge = (id) => { const t = toolOf(id); const b = el("span", "tool"); b.style.borderColor = t.color; b.style.color = t.color; b.style.background = t.color + "14"; const dot = el("i"); dot.style.background = t.color; b.append(dot, el("span", null, t.name)); return b; };
-  const roleName = (id) => roles[roleIx.get(id)].name;
-  // 行の性質。actor が無ければ、人数が 1 以上なら人、行のノードがすべて自動なら自動とみなす。どちらでもなければ出さない。
-  const actorOf = (r, ri) => {
-    if (ACTOR[r.actor]) return r.actor;
-    if (Number(r.people) > 0) return "human";
-    const own = nodes.filter((n) => roleIx.get(n.role) === ri);
-    return own.length && own.every((n) => n.auto) ? "auto" : "";
+  // ---- 人の関わり（設計書「人の関わりときっかけ」の 1。上から順に、最初に当たったもの） ----
+  const condAt = (n, p) => textAt(n.conds, p);
+  const INV = (n, p) => {
+    if (condAt(n, p)) return "cond";
+    if (n.human || n.session === "human") return "human";
+    if (n.layer === "upstream" && roles[roleIx.get(n.role)].decides) return "human";
+    if (n.session === "plan" || n.session === "run") return "agent";
+    return "auto";
   };
-  const stageName = (id) => stages[stageIx.get(id)].name;
 
-  // ---- キャンバス ----
-  const COL_W = 248, NODE_W = 184, HEAD_W = 156, HEAD_H = 44, PAD = 32, GAP_Y = 14, MIN_LANE = 110;
-  const world = document.getElementById("world"), svg = document.getElementById("edges"), viewport = document.getElementById("viewport");
-  const nodeEls = new Map();
-  nodes.forEach((n) => {
-    const d = el("div", "node" + (n.layer === "upstream" ? " upstream" : "") + (n.kind === "gate" ? " gate" : ""));
-    d.dataset.id = n.id; d.dataset.nodeId = n.id; d.title = n.title;
-    // カードはパッと見で分かることだけ：1行目に種類と誰が動かすか（と関門の戻しにくさ・人）、短い名前、スキル名（あれば1行）、
-    // 足りないもの・段階・関門の中の検査の印。題名の全文・判定・成果物・ツール・理由の文章は、クリックで出る詳細と表のタブに出す。
-    const top = el("div", "top");
-    // 種類は、作業（work）のときは出さない（ふつうのノード。セッションの「実行」と紛れないように）。
-    const kd = el("span", "kind"); if (n.kind === "work") { /* 出さない */ } else if (KIND_IC[n.kind]) { kd.append(el("b", null, KIND_IC[n.kind][0]), KIND_IC[n.kind][1]); } else kd.textContent = "種類不明"; top.append(kd);
-    // 人を置く関門で、セッションも人のときは「人」を2つ並べない。
-    if (!(n.human && n.session === "human")) top.append(sessionChip(n.session, n.auto));
-    if (n.kind === "gate") top.append(riskChip(n.risk));
-    if (n.human) top.append(el("span", "chip humanflag", "人"));
-    d.append(top, el("div", "title", n.card));
-    if (n.skills.length) { const sk = el("div", "skills", n.skills.join(" · ")); sk.title = n.skills.join(" · "); d.append(sk); }
-    // 足りないものの印と検査の数は段階で変わるので、fillCard で段階ごとに入れ直す。
-    n._row = el("div", "row"); d.append(n._row);
-    // 段階の印は、カードの高さを変えないよう枠の上に重ねる（段階を切り替えても配置が動かない）。
-    n._phaseBadge = el("span", "mark inline phase"); n._phaseBadge.hidden = true; d.append(n._phaseBadge);
-    world.append(d); nodeEls.set(n.id, d);
-  });
-
-  // 段階 p のカードの中身（足りないものの印・破線の枠・検査の数と点）を入れる。
-  const fillCard = (n, p) => {
-    const st = stateAt(n, p), d = nodeEls.get(n.id), r1 = n._row;
-    d.classList.toggle("gap", st.isGap);
-    r1.replaceChildren();
-    st.tags.forEach((t) => r1.append(el("span", "chip gapflag", t)));
-    if (st.checks.length) {
-      const b = el("button", "checks-btn"); b.type = "button"; b.title = "中の検査を開く";
-      b.append(el("span", null, "検査 " + st.checks.length));
-      st.checks.forEach((c) => { const dot = el("i"); dot.style.background = gapAt(c, p) ? "var(--gap)" : c.session === "human" ? "var(--ink)" : c.session === "run" ? "var(--run)" : c.session === "plan" ? "var(--plan)" : "var(--human)"; b.append(dot); });
-      b.append(el("span", null, "▾"));
-      b.addEventListener("click", (ev) => { ev.stopPropagation(); toggleChecks(n.id); });
-      r1.append(b);
-    }
-    r1.hidden = !r1.childElementCount;
+  // ---- 段階 p でのノードの足りないもの ----
+  const stateAt = (n, p) => {
+    const checks = n.checks.filter((c) => aliveAt(c, p));
+    const gap = textAt(n.gaps, p);
+    const noSkill = n.wantsSkill && !checks.length; // 中の検査があるときは、検査ごとに見る
+    const checkGaps = checks.filter((c) => textAt(c.gaps, p));
+    const own = !!gap || n.missing.length > 0 || noSkill;
+    const tags = n.missing.map((m) => m + "が不明").concat(noSkill ? ["スキル無し"] : []);
+    return { checks, gap, noSkill, checkGaps, tags, own, isGap: own || checkGaps.length > 0 };
   };
-  // カードの高さは、すべての段階（と「全部」）でいちばん高いものに揃える。段階を切り替えても配置が動かない。
-  nodes.forEach((n) => {
-    let h = 0;
-    [-1].concat(phases.map((_, i) => i)).forEach((p) => { fillCard(n, p); h = Math.max(h, nodeEls.get(n.id).offsetHeight); });
-    nodeEls.get(n.id).style.minHeight = h + "px";
-  });
 
-  // 高さを測ってから、決まった順で置く
-  const pos = new Map();
-  const cells = new Map();
-  nodes.forEach((n) => { const k = roleIx.get(n.role) + ":" + stageIx.get(n.stage); if (!cells.has(k)) cells.set(k, []); cells.get(k).push(n); });
-  let y = HEAD_H;
-  const laneTops = [];
-  roles.forEach((r, ri) => {
-    let laneH = MIN_LANE;
-    stages.forEach((s, si) => { const list = cells.get(ri + ":" + si) || []; const h = list.reduce((a, n) => a + nodeEls.get(n.id).offsetHeight, 0) + Math.max(0, list.length - 1) * GAP_Y + PAD * 2; laneH = Math.max(laneH, h); });
-    laneTops.push([y, laneH]);
-    stages.forEach((s, si) => {
-      let cy = y + PAD;
-      (cells.get(ri + ":" + si) || []).forEach((n) => {
-        const e = nodeEls.get(n.id), h = e.offsetHeight, x = HEAD_W + si * COL_W + (COL_W - NODE_W) / 2;
-        e.style.left = x + "px"; e.style.top = cy + "px"; pos.set(n.id, { x, y: cy, w: NODE_W, h }); cy += h + GAP_Y;
-      });
+  // ---- 足りないものと重さの順（設計書の決まったこと 7。数え方は前の図と同じ） ----
+  // 1 戻しにくさ → 2 人の関門と戻り道 → 3 エージェントの段のスキル → 4 検査 → 5 書き漏れ。同じ順の中は流れの上流から。
+  const TIER = { 1: "戻しにくさ", 2: "人の関門と戻り道", 3: "スキル", 4: "検査", 5: "書き漏れ" };
+  const gapsMemo = new Map();
+  const gapsAt = (p) => {
+    if (gapsMemo.has(p)) return gapsMemo.get(p);
+    const ns = nodes.filter((n) => aliveAt(n, p)), ids = new Set(ns.map((n) => n.id));
+    const es = edges.filter((e) => aliveAt(e, p) && ids.has(e.from) && ids.has(e.to));
+    const st = new Map(ns.map((n) => [n.id, stateAt(n, p)]));
+    const out = [];
+    const add = (tier, sub, text, nodeIds, stage, checks = [], scope = "node") => out.push({ tier, sub, text, nodes: nodeIds, stage, checks, scope });
+    const last = stages[stages.length - 1].id;
+    stages.forEach((s) => {
+      const ins = ns.filter((n) => n.stage === s.id);
+      if (!ins.length) add(5, 0, `段「${s.name}」にノードが無い`, [], s.id, [], "stage");
+      else if (ins.every((n) => st.get(n.id).isGap)) add(3, 0, `段「${s.name}」に、スキルの決まったノードが無い`, ins.map((n) => n.id), s.id);
     });
-    y += laneH;
-  });
-  const W = HEAD_W + stages.length * COL_W, H0 = y;
+    ns.forEach((n) => {
+      const x = st.get(n.id); if (!x.own) return;
+      const text = x.gap || "欠けている：" + x.tags.join("、");
+      if (n.kind === "gate") add(1, RR[n.risk] ?? 3, text, [n.id], n.stage);
+      else if (n.session === "plan" || n.session === "run") add(3, 0, text, [n.id], n.stage);
+      else add(5, 0, text, [n.id], n.stage);
+    });
+    ns.forEach((n) => st.get(n.id).checkGaps.forEach((c) => add(4, RR[n.risk] ?? 3, textAt(c.gaps, p), [n.id], n.stage, [c.key])));
+    if (!es.some((e) => e.kind === "learn")) add(2, 0, "学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", [], last, [], "flow");
+    if (!es.some((e) => e.kind === "fix")) add(2, 0, "直しの辺が無い（関門から、その単位を作った実行へ差し戻す矢印）", [], last, [], "flow");
+    const humans = ns.filter((n) => n.human);
+    if (humans.length !== 1) add(2, 0, `人を置く関門が ${humans.length} か所（1 か所、いちばん重くて戻しにくい所に置く）`, humans.map((n) => n.id), (humans[0] || ns[0] || { stage: last }).stage, [], humans.length ? "node" : "flow");
+    ns.filter((n) => n.layer !== "upstream" && n.session === "human" && !n.human).forEach((n) => add(2, 0, "流れの途中に人がいる（人を置くのは 1 か所に絞る）", [n.id], n.stage));
+    ns.filter((n) => n.kind === "gate" && !RISK[n.risk]).forEach((n) => add(1, 3, "戻しにくさが書かれていない", [n.id], n.stage));
+    ns.filter((n) => n.kind === "gate" && n.risk === "irreversible" && !n.human).forEach((n) => add(1, 0, "戻せない変更を、人を置かずに通している", [n.id], n.stage));
+    ns.filter((n) => (n.kind === "work" || n.kind === "gate") && !n.check && !(st.get(n.id).checks.length && st.get(n.id).checks.every((c) => c.check))).forEach((n) => add(4, 3, "判定（プログラムで評価できる形）が書かれていない", [n.id], n.stage));
+    ns.filter((n) => n.layer !== "upstream" && !KIND[n.kind]).forEach((n) => add(5, 0, "ノードの種類（分ける・作業・コード・関門）が書かれていない", [n.id], n.stage));
+    if (D.version == null) add(5, 0, "仕様書に version が無い（この図は version 2 の形として読んだ）", [], last, [], "flow");
+    else if (![1, 2].includes(Number(D.version))) add(5, 0, `仕様書の version が ${D.version}（この図が読むのは version 1 と 2）`, [], last, [], "flow");
+    problems.forEach((t) => add(5, 0, t, [], last, [], "flow"));
+    // 同じ理由の文は 1 行にまとめる（「CI がまだ無い」が 3 つの検査にあれば、検査の名前を添えて 1 行）
+    const list = [];
+    out.forEach((o) => {
+      const m = o.nodes.length && list.find((q) => q.tier === o.tier && q.text === o.text && q.nodes.length);
+      if (m) { m.nodes = uniq(m.nodes.concat(o.nodes)); m.checks = uniq(m.checks.concat(o.checks)); m.sub = Math.min(m.sub, o.sub); } else list.push(Object.assign({}, o));
+    });
+    list.forEach((o, i) => { o.order = i; });
+    list.sort((a, b) => a.tier - b.tier || a.sub - b.sub || stageIx.get(a.stage) - stageIx.get(b.stage) || a.order - b.order);
+    list.forEach((o, i) => { o.key = "g" + i; o.checkTitles = o.checks.map((k) => checkByKey.get(k).title); });
+    const res = { list, st };
+    gapsMemo.set(p, res);
+    return res;
+  };
+  const gapWho = (o) => o.nodes.length ? o.nodes.map(short).join("・") : o.scope === "stage" ? `段「${stName(o.stage)}」` : "流れ全体";
+  const gapText = (o) => o.text + (o.checkTitles.length ? "（" + o.checkTitles.join("・") + "）" : "");
 
-  // 背景：上流の列の色、レーン、見出し
-  const bg = document.createDocumentFragment();
-  stages.forEach((s, si) => {
-    const inStage = nodes.filter((n) => n.stage === s.id);
-    const upstream = inStage.length > 0 && inStage.every((n) => n.layer === "upstream");
-    if (upstream) { const t = el("div", "col-tint"); Object.assign(t.style, { left: HEAD_W + si * COL_W + "px", top: 0, width: COL_W + "px", height: H0 + "px" }); bg.append(t); }
-    const h = el("div", "col-head"); h.dataset.stageId = s.id; Object.assign(h.style, { left: HEAD_W + si * COL_W + "px", top: 0, width: COL_W + "px" });
-    h.append(el("span", null, s.name)); if (upstream) h.append(el("small", null, "上流")); bg.append(h);
-  });
-  roles.forEach((r, ri) => {
-    const [top, h] = laneTops[ri];
-    const lane = el("div", "lane"); Object.assign(lane.style, { left: HEAD_W + "px", top: top + "px", width: W - HEAD_W + "px", height: h + "px", background: ri % 2 ? "var(--lane-b)" : "var(--lane-a)" }); bg.append(lane);
-    const head = el("div", "lane-head"); Object.assign(head.style, { left: 0, top: top + "px", width: HEAD_W + "px", height: h + "px" });
-    head.dataset.roleId = r.id; lane.dataset.roleId = r.id;
-    head.append(el("b", null, r.name));
-    // 行の性質：人は人数、エージェントと自動は印だけ（「0 人」とは出さない）。
-    const actor = actorOf(r, ri);
-    if (actor === "human") head.append(el("span", "actor human", Number(r.people) > 0 ? r.people + " 人" : "人"));
-    else if (actor) head.append(el("span", "actor " + actor, ACTOR[actor]));
-    if (r.decides) head.append(el("span", "decides", "決める役"));
-    if (r.missing) head.append(el("span", "chip unknown", "役割が設計に無い"));
-    bg.append(head);
-  });
-  const corner = el("div", "col-head"); Object.assign(corner.style, { left: 0, top: 0, width: HEAD_W + "px" }); corner.append(el("span", null, "役割 ＼ 段")); bg.append(corner);
-  world.prepend(bg);
-
-  // 矢印
-  const NS = "http://www.w3.org/2000/svg";
-  const s = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-  const defs = s("defs", {});
-  [["arrow", "#8a93a6"], ["arrowhl", "#f59e0b"]].forEach(([id, c]) => { const m = s("marker", { id, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" }); m.append(s("path", { d: "M0,0 L10,5 L0,10 z", fill: c })); defs.append(m); });
-  svg.append(defs);
-  const edgeEls = [];
-  const labelLayer = s("g", {});
-  // 直角に折れる線。縦の線は列の間の溝、横の線はレーンの境目を通す。同じ溝・境目を通る線は少しずつずらす。
-  const gutterX = (c) => HEAD_W + c * COL_W;
-  const laneTop = (r) => laneTops[r][0];
-  const used = new Map();
-  const slot = (key) => { const k = used.get(key) || 0; used.set(key, k + 1); return (k % 2 ? -1 : 1) * Math.ceil(k / 2) * 6; };
-  // 出入りの口は、相手のノードの高さの順に並べる（口の所で線が交わらないように）。
-  const cy = (id) => { const p = pos.get(id); return p.y + p.h / 2; };
-  const portOf = new Map();
-  nodes.forEach((n) => {
-    const outs = edges.filter((e) => e.from === n.id).sort((x, y) => cy(x.to) - cy(y.to));
-    const ins = edges.filter((e) => e.to === n.id).sort((x, y) => cy(x.from) - cy(y.from));
-    // 口の間隔は 10px。本数が多くてカードからはみ出すときは、カードの高さに収まるよう詰める。
-    const step = (m) => (m > 1 ? Math.min(10, (pos.get(n.id).h - 16) / (m - 1)) : 0);
-    outs.forEach((e, k) => { e._sy = cy(n.id) + (k - (outs.length - 1) / 2) * step(outs.length); });
-    ins.forEach((e, k) => { e._ty = cy(n.id) + (k - (ins.length - 1) / 2) * step(ins.length); });
-  });
-  // 引いた線の縦・横の線分。横の線を通す境目は、これと交わる数がいちばん少ないものを選ぶ。
-  const segs = [];
-  const crossCount = (pts) => {
-    let n = 0;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const [x1, y1] = pts[i], [x2, y2] = pts[i + 1];
-      for (const [u1, v1, u2, v2] of segs) {
-        const h1 = y1 === y2, h2 = v1 === v2;
-        if (h1 === h2) continue;
-        const [hx1, hx2, hy] = h1 ? [Math.min(x1, x2), Math.max(x1, x2), y1] : [Math.min(u1, u2), Math.max(u1, u2), v1];
-        const [vx, vy1, vy2] = h1 ? [u1, Math.min(v1, v2), Math.max(v1, v2)] : [x1, Math.min(y1, y2), Math.max(y1, y2)];
-        if (vx > hx1 && vx < hx2 && hy > vy1 && hy < vy2) n++;
-      }
-    }
-    return n;
+  // ---- 段階の差（c）。同じ段で無くなるものと足すものは「置き換え」にまとめる（決まったこと 8） ----
+  const diffAt = (p) => {
+    const none = { add: [], rem: [], rep: [], chg: [], edges: [] };
+    if (p <= 0 || !phases.length) return none;
+    const now = (o) => aliveAt(o, p), was = (o) => aliveAt(o, p - 1);
+    let add = nodes.filter((n) => now(n) && !was(n)).map((n) => n.id), rem = nodes.filter((n) => !now(n) && was(n)).map((n) => n.id);
+    const rep = [];
+    stages.forEach((s) => {
+      const a = add.filter((id) => byId.get(id).stage === s.id), r = rem.filter((id) => byId.get(id).stage === s.id);
+      if (a.length && r.length) { rep.push({ from: r, to: a }); add = add.filter((x) => !a.includes(x)); rem = rem.filter((x) => !r.includes(x)); }
+    });
+    const chg = [];
+    nodes.filter((n) => now(n) && was(n)).forEach((n) => {
+      const w = [];
+      n.checks.forEach((c) => {
+        if (now(c) && !was(c)) w.push(["検査が増えた", c.title]);
+        if (!now(c) && was(c)) w.push(["検査が無くなった", c.title]);
+        if (now(c) && was(c) && textAt(c.gaps, p - 1) && !textAt(c.gaps, p)) w.push(["足りないものが埋まった", c.title]);
+        if (now(c) && was(c) && !textAt(c.gaps, p - 1) && textAt(c.gaps, p)) w.push(["足りないものが出た", c.title]);
+      });
+      if (textAt(n.gaps, p - 1) && !textAt(n.gaps, p)) w.push(["足りないものが埋まった", ""]);
+      if (!textAt(n.gaps, p - 1) && textAt(n.gaps, p)) w.push(["足りないものが出た", ""]);
+      const i0 = INV(n, p - 1), i1 = INV(n, p);
+      if (i0 !== i1) w.push(["人の関わり", INVL[i0] + " → " + INVL[i1]]);
+      const what = uniq(w.map((x) => x[0])).map((k) => { const vs = w.filter((x) => x[0] === k && x[1]).map((x) => x[1]); return vs.length ? k + "：" + vs.join("・") : k; });
+      if (what.length) chg.push({ id: n.id, what });
+    });
+    // 線：両端のノードが前の段階にも今の段階にも在るのに、線だけが増えた・無くなったもの
+    const ed = edges.filter((e) => e.kind === "data" && now(e) !== was(e) && [e.from, e.to].every((id) => now(byId.get(id)) && was(byId.get(id)))).map((e) => ({ e, added: now(e) }));
+    return { add, rem, rep, chg, edges: ed };
   };
-  const rounded = (pts, r = 7) => {
-    let d = `M${pts[0][0]},${pts[0][1]}`;
-    for (let i = 1; i < pts.length - 1; i++) {
-      const [px, py] = pts[i - 1], [x, y] = pts[i], [nx, ny] = pts[i + 1];
-      const r1 = Math.min(r, Math.hypot(x - px, y - py) / 2, Math.hypot(nx - x, ny - y) / 2);
-      const ax = x - Math.sign(x - px) * r1, ay = y - Math.sign(y - py) * r1, bx = x + Math.sign(nx - x) * r1, by = y + Math.sign(ny - y) * r1;
-      d += ` L${ax},${ay} Q${x},${y} ${bx},${by}`;
-    }
-    const [lx, ly] = pts[pts.length - 1];
-    return d + ` L${lx},${ly}`;
+  const changeOf = (df, id) => {
+    if (df.add.includes(id)) return "足す";
+    const r = df.rep.find((q) => q.to.includes(id) || q.from.includes(id));
+    if (r) return "置き換え：" + r.from.map(short).join("・") + " → " + r.to.map(short).join("・");
+    const c = df.chg.find((q) => q.id === id); if (c) return "変わる：" + c.what.join("／");
+    if (df.rem.includes(id)) return "無くなる";
+    return "変わらない";
   };
-  // 短い矢印から順に引く（決まった順なので、同じ仕様書からは同じ図になる）。
-  const span = (e) => Math.abs(stageIx.get(byId.get(e.to).stage) - stageIx.get(byId.get(e.from).stage)) * 10 + Math.abs(roleIx.get(byId.get(e.to).role) - roleIx.get(byId.get(e.from).role));
-  let bottomUsed = 0;
-  const order = edges.map((e, i) => [e, i]).sort((x, y) => span(x[0]) - span(y[0]) || x[1] - y[1]).map(([e]) => e);
-  order.forEach((e) => {
-    const na = byId.get(e.from), nb = byId.get(e.to), a = pos.get(e.from), b = pos.get(e.to);
-    const ca = stageIx.get(na.stage), cb = stageIx.get(nb.stage), ra = roleIx.get(na.role), rb = roleIx.get(nb.role);
-    const sy = e._sy, ty = e._ty;
-    // 前へ進む矢印は右から出て左へ入る。戻る矢印は左から出て右へ入る。同じ列は右から出て右へ入る。
-    const fwd = cb > ca, same = cb === ca;
-    const sx = fwd || same ? a.x + a.w : a.x, tx = fwd ? b.x : b.x + b.w;
-    const c1 = fwd || same ? ca + 1 : ca, c2 = fwd ? cb : cb + 1;
-    let pts;
-    if (c1 === c2) {
-      const gx = gutterX(c1) + slot("g" + c1);
-      pts = [[sx, sy], [gx, sy], [gx, ty], [tx, ty]];
-    } else {
-      // 横の線はレーンの境目を通す。候補は、出る側と入る側のレーンを囲む境目。
-      const lo = Math.min(ra, rb), hi = Math.max(ra, rb) + 1;
-      const x1 = gutterX(c1) + slot("g" + c1), x2 = gutterX(c2) + slot("g" + c2);
-      let best = null;
-      const cands = [...new Set([...Array(hi - lo + 1).keys()].map((k) => lo + k).concat([0, roles.length]))];
-      for (const r of cands) {
-        const ch = (r >= roles.length ? H0 + 16 : laneTop(r)) + ((used.get("h" + r) || 0) % 2 ? -1 : 1) * Math.ceil((used.get("h" + r) || 0) / 2) * 6;
-        const cand = [[sx, sy], [x1, sy], [x1, ch], [x2, ch], [x2, ty], [tx, ty]];
-        const c = crossCount(cand);
-        if (!best || c < best.c) best = { c, r };
-      }
-      const ch = (best.r >= roles.length ? H0 + 16 : laneTop(best.r)) + slot("h" + best.r);
-      if (best.r >= roles.length) bottomUsed = Math.max(bottomUsed, ch);
-      pts = [[sx, sy], [x1, sy], [x1, ch], [x2, ch], [x2, ty], [tx, ty]];
-    }
-    for (let i = 0; i < pts.length - 1; i++) segs.push([pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]]);
-    const p = s("path", { d: rounded(pts), class: "edge" + (e.kind !== "data" ? " " + e.kind : ""), "marker-end": "url(#arrow)", "data-edge-id": e.id });
-    svg.append(p);
-    const item = { e, p, g: null };
-    edgeEls.push(item);
-    { // 矢印の名前と注記を置く所：いちばん長い横の線の真ん中
-      let best = null;
-      for (let i = 0; i < pts.length - 1; i++) { const [x, y] = pts[i], [nx, ny] = pts[i + 1]; if (y === ny && (!best || Math.abs(nx - x) > best.len)) best = { len: Math.abs(nx - x), x: (x + nx) / 2, y }; }
-      e._lp = best || { x: (sx + tx) / 2, y: (sy + ty) / 2 };
-    }
-    if (e.label) {
-      const m = e._lp;
-      const t = s("text", { x: m.x, y: m.y + 4, "text-anchor": "middle", class: "edge-label" }); t.textContent = (e.kind !== "data" ? EDGE_KIND[e.kind] + "：" : "") + e.label;
-      const g = s("g", { "data-edge-id": e.id }); g.append(t); labelLayer.append(g);
-      e._t = t; e._g = g; item.g = g;
-    }
-  });
-  svg.append(labelLayer);
-  edges.forEach((e) => { if (!e._t) return; const bb = e._t.getBBox(); e._g.prepend(s("rect", { x: bb.x - 4, y: bb.y - 2, width: bb.width + 8, height: bb.height + 4, rx: 4, class: "edge-label-bg" })); });
-  const H = Math.max(H0, bottomUsed) + 24;
-  // 矢印の種類ごとの表示。学びの矢印は最初は隠す。選んだノードにつながる矢印は、隠していても出す。
-  // 矢印の名前（渡す成果物）は文章なので、最初は隠し、選んだノードの矢印と「名前」を入れたときだけ出す。
-  // 段階を選んでいるときは、その段階に無いノードと矢印を隠す（配置は変えない）。
-  const shown = { data: true, fix: true, learn: false };
-  let selectedId = null, showNames = false, phase = phases.length ? phases.length - 1 : -1;
-  const nodeAlive = (n) => aliveAt(n, phase);
-  const edgeAlive = (e) => aliveAt(e, phase) && nodeAlive(byId.get(e.from)) && nodeAlive(byId.get(e.to));
-  const refreshEdges = () => edgeEls.forEach(({ e, p, g }) => {
-    const on = !!selectedId && (e.from === selectedId || e.to === selectedId);
-    const vis = edgeAlive(e) && (shown[e.kind] || on);
-    p.style.display = vis ? "" : "none"; if (g) g.style.display = vis && (showNames || on) ? "" : "none";
-    if (e._m) e._m.style.display = vis ? "" : "none";
-  });
-  document.querySelectorAll("input[data-edge]").forEach((cb) => cb.addEventListener("change", () => { shown[cb.dataset.edge] = cb.checked; refreshEdges(); }));
-  document.getElementById("edgeNames").addEventListener("change", (ev) => { showNames = ev.target.checked; refreshEdges(); });
-  Object.assign(svg.style, { width: W + "px", height: H + "px" }); svg.setAttribute("width", W); svg.setAttribute("height", H);
-  world.style.width = W + "px"; world.style.height = H + "px";
-
-  // パンとズーム。初めは文字が読める倍率（題名 13px が 12px 以上）で流れの始まりを出す。全体が読める倍率で収まるときは全体を出す。
-  const READABLE = 12 / 13;
-  let k = 1, tx = 0, ty = 0;
-  const clampPan = () => {
-    const vw = viewport.clientWidth, vh = viewport.clientHeight, m = 80;
-    tx = Math.min(vw - m, Math.max(m - W * k, tx)); ty = Math.min(vh - m, Math.max(m - H * k, ty));
-  };
-  const apply = () => { clampPan(); world.style.transform = `translate(${tx}px,${ty}px) scale(${k})`; };
-  const zoomAt = (f, cx, cy) => { const nk = Math.min(2.5, Math.max(0.2, k * f)); tx = cx - (cx - tx) * (nk / k); ty = cy - (cy - ty) * (nk / k); k = nk; apply(); };
-  const fitScale = () => Math.min(1, (viewport.clientWidth - 40) / W, (viewport.clientHeight - 40) / H);
-  const fit = () => { const vw = viewport.clientWidth, vh = viewport.clientHeight; k = fitScale(); tx = (vw - W * k) / 2; ty = Math.max(20, (vh - H * k) / 2); apply(); };
-  const home = () => {
-    if (fitScale() >= READABLE) { fit(); return; }
-    const vh = viewport.clientHeight; k = 1; tx = 20; ty = Math.max(20, (vh - H) / 2); apply();
-  };
-  const panBy = (dx, dy) => { tx -= dx; ty -= dy; apply(); };
-  // ホイール：そのままなら移動（トラックパッドの二本指、マウスのホイール、Shift＋ホイールで横）。
-  // ピンチ（ブラウザは ctrlKey 付きの wheel で送る）と ⌘・Ctrl＋スクロールは拡大縮小。
-  viewport.addEventListener("wheel", (ev) => {
-    ev.preventDefault();
-    const unit = ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? viewport.clientHeight : 1;
-    let dx = ev.deltaX * unit, dy = ev.deltaY * unit;
-    if (ev.ctrlKey || ev.metaKey) {
-      const r = viewport.getBoundingClientRect(), d = Math.max(-30, Math.min(30, dy));
-      zoomAt(Math.exp(-d * 0.008), ev.clientX - r.left, ev.clientY - r.top); return;
-    }
-    if (ev.shiftKey && !dx) { dx = dy; dy = 0; }
-    panBy(dx, dy);
-  }, { passive: false });
-  // ドラッグで移動。左ボタンだけで掴み、離した・取り消された・掴みが外れた・フォーカスが外れたときは必ず放す。
-  let drag = null;
-  const endDrag = () => {
-    const d = drag; if (!d) return null;
-    drag = null; viewport.classList.remove("dragging");
-    try { if (viewport.hasPointerCapture(d.id)) viewport.releasePointerCapture(d.id); } catch (_) { /* 掴みがもう無い */ }
-    return d;
-  };
-  viewport.addEventListener("pointerdown", (ev) => {
-    if (ev.button !== 0 || ev.target.closest(".node")) return;
-    endDrag(); ev.preventDefault();
-    drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY, tx, ty, moved: false };
-    viewport.classList.add("dragging");
-    try { viewport.setPointerCapture(ev.pointerId); } catch (_) { /* 掴めなくても、離したときの処理で放す */ }
-  });
-  viewport.addEventListener("pointermove", (ev) => {
-    if (!drag || ev.pointerId !== drag.id) return;
-    if (ev.buttons === 0) { endDrag(); return; }
-    const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
-    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
-    drag.moved = true; tx = drag.tx + dx; ty = drag.ty + dy; apply();
-  });
-  viewport.addEventListener("pointerup", (ev) => { if (!drag || ev.pointerId !== drag.id) return; const d = endDrag(); if (!d.moved) select(null); });
-  viewport.addEventListener("pointercancel", endDrag);
-  viewport.addEventListener("lostpointercapture", endDrag);
-  viewport.addEventListener("dragstart", (ev) => ev.preventDefault());
-  window.addEventListener("blur", endDrag);
-  document.addEventListener("visibilitychange", () => { if (document.hidden) endDrag(); });
-  const center = () => [viewport.clientWidth / 2, viewport.clientHeight / 2];
-  document.getElementById("zoomIn").onclick = () => zoomAt(1.2, ...center());
-  document.getElementById("zoomOut").onclick = () => zoomAt(1 / 1.2, ...center());
-  document.getElementById("zoomFit").onclick = fit;
-  // キー：+ と -（JIS の + は Shift＋; なので = も）で拡大縮小、0 で全体、矢印で移動（Shift で大きく）、Esc で選択を外す。
-  // ⌘・Ctrl・Alt 付きはブラウザに任せる。
-  document.addEventListener("keydown", (ev) => {
-    if (document.getElementById("canvasView").hidden || ev.ctrlKey || ev.metaKey || ev.altKey) return;
-    if (ev.target.closest && ev.target.closest("input, textarea, select, [contenteditable]")) return;
-    const step = ev.shiftKey ? 320 : 80;
-    const act = { "+": () => zoomAt(1.2, ...center()), "=": () => zoomAt(1.2, ...center()),
-      "-": () => zoomAt(1 / 1.2, ...center()), "_": () => zoomAt(1 / 1.2, ...center()), "0": fit,
-      ArrowLeft: () => panBy(-step, 0), ArrowRight: () => panBy(step, 0), ArrowUp: () => panBy(0, -step), ArrowDown: () => panBy(0, step),
-      Escape: () => select(null) }[ev.key];
-    if (!act) return;
-    ev.preventDefault(); act();
-  });
 
   // ---- 注記（ほかの道具が重ねるもの） ----
   // 形：{"version":1,"source":"道具の名前","title":"何の注記か","marks":[{"target":"node:ID | edge:ID | check:ノードID/検査ID","level":"info | warn | error | muted","label":"短い印","text":"詳しく"}]}
-  // 注記は印を重ねるだけで、カードの大きさも線も変えない。図に無い対象の印は「注記」のタブに出す。
-  const LEVEL = { info: "情報", warn: "注意", error: "問題", muted: "薄く出す" };
+  // 注記は色を使わない小さな白い札で、見方 a・b に出す（c には出さない）。図に無い対象の注記は「表」に出す。
+  const LEVEL = { info: 1, warn: 1, error: 1, muted: 1 };
   let O = null; const overlayRaw = document.getElementById("overlay").textContent.trim();
   if (!overlayRaw.startsWith("/*OVERLAY*/")) { try { O = JSON.parse(overlayRaw); } catch (e) { problems.push("注記の JSON を読めませんでした：" + e.message); } }
-  const marks = (O && typeof O === "object" ? arr(O.marks) : []).map((m, i) => {
+  const marks = (O && typeof O === "object" ? arr(O.marks) : []).map((m) => {
     m = m && typeof m === "object" ? m : {};
     const target = str(m.target), [type, ...rest] = target.split(":"), ref = rest.join(":");
     const level = LEVEL[str(m.level)] ? str(m.level) : "info";
-    return { i, target, type, ref, level, label: str(m.label, LEVEL[level]), text: str(m.text) };
+    const found = (type === "node" && byId.has(ref)) || (type === "edge" && edgeById.has(ref)) || (type === "check" && checkByKey.has(ref));
+    return { target, type, ref, level, label: str(m.label, "注記"), text: str(m.text), found };
   });
-  const checkByKey = new Map(); nodes.forEach((n) => n.checks.forEach((c) => checkByKey.set(c.key, c)));
-  const edgeById = new Map(edges.map((e) => [e.id, e]));
-  const marksOf = new Map();
-  marks.forEach((m) => {
-    m.found = (m.type === "node" && byId.has(m.ref)) || (m.type === "edge" && edgeById.has(m.ref)) || (m.type === "check" && checkByKey.has(m.ref));
-    if (!m.found) return;
-    const k = m.type + ":" + m.ref; if (!marksOf.has(k)) marksOf.set(k, []); marksOf.get(k).push(m);
-  });
-  const markBadge = (m, inline) => { const b = el("span", "mark " + m.level + (inline ? " inline" : ""), m.label); b.title = (m.text ? m.label + "：" + m.text : m.label) + (O && O.source ? "（" + str(O.source) + "）" : ""); return b; };
-  const worst = (list) => ["error", "warn", "info", "muted"].find((l) => list.some((m) => m.level === l));
-  nodes.forEach((n) => {
-    const list = marksOf.get("node:" + n.id) || [], d = nodeEls.get(n.id);
-    if (list.length) { const b = markBadge(list[0]); if (list.length > 1) b.textContent += ` ＋${list.length - 1}`; d.append(b); }
-    if (list.length && list.every((m) => m.level === "muted")) d.classList.add("marked-muted");
-    const cm = n.checks.flatMap((c) => marksOf.get("check:" + c.key) || []);
-    if (cm.length && !list.length) { const b = markBadge({ level: worst(cm), label: "検査に注記 " + cm.length, text: "" }); d.append(b); }
-  });
-  edgeEls.forEach(({ e, p }) => {
-    const list = marksOf.get("edge:" + e.id) || []; if (!list.length) return;
-    const lv = worst(list); p.classList.add("mark-" + lv);
-    const pt = e._lp; // 矢印の名前と同じ所（いちばん長い横の線の真ん中）に置く
-    const g = s("g", { class: "edge-mark " + lv, "data-edge-id": e.id }); const t = s("text", { x: pt.x, y: pt.y + 4, "text-anchor": "middle" }); t.textContent = list[0].label + (list.length > 1 ? ` ＋${list.length - 1}` : "");
-    g.append(t); svg.append(g); const bb = t.getBBox(); g.prepend(s("rect", { x: bb.x - 6, y: bb.y - 2, width: bb.width + 12, height: bb.height + 4 }));
-    const tt = s("title", {}); tt.textContent = list.map((m) => m.label + (m.text ? "：" + m.text : "")).join("\n"); g.append(tt);
-    e._m = g;
-  });
-  if (O) {
-    const mt = document.getElementById("markTab"); mt.hidden = false; mt.textContent = "注記" + (O.source ? "（" + str(O.source) + "）" : "");
-    const t2 = el("table"), hr = el("tr"); ["対象", "印", "詳しく"].forEach((h) => hr.append(el("th", null, h))); t2.append(hr);
-    const nameOf = (m) => m.type === "node" ? byId.get(m.ref).title : m.type === "edge" ? `${byId.get(edgeById.get(m.ref).from).title} → ${byId.get(edgeById.get(m.ref).to).title}` : `${byId.get(m.ref.split("/")[0]).title} の検査「${checkByKey.get(m.ref).title}」`;
-    marks.forEach((m) => { const tr = el("tr", m.found ? "" : "gaprow"); const c1 = el("td", null, m.found ? nameOf(m) : m.target + "（図に無い）"); const c2 = el("td"); c2.append(markBadge(m, true)); tr.append(c1, c2, el("td", null, m.text)); t2.append(tr); });
-    document.getElementById("markDoc").replaceChildren(el("h2", null, str(O.title, "注記")), marks.length ? t2 : el("p", null, "注記はありません。"));
-  }
+  const marksOf = groupBy(marks.filter((m) => m.found), (m) => m.type + ":" + m.ref);
+  const mk = (k) => marksOf.get(k) || [];
+  const source = O && O.source ? "（" + str(O.source) + "）" : "";
+  const markLine = (m) => "✎ " + m.label + (m.text ? "：" + m.text : "") + source;
 
-  // ---- 関門の中の検査 ----
-  // p を渡すと、その段階に在る検査だけを出す。表（段階に関係なく全部を並べる）では p を渡さず、段階を添える。
-  const checksList = (n, p) => {
-    const ol = el("ol", "checks");
-    n.checks.filter((c) => p == null || aliveAt(c, p)).forEach((c) => {
-      const gap = gapAt(c, p == null ? -1 : p);
-      const li = el("li", gap ? "gap" : ""); li.dataset.checkId = c.key;
-      li.append(sessionChip(c.session, c.auto), el("b", null, c.title));
-      const sub = [];
-      if (c.check) sub.push("判定：" + c.check);
-      if (c.skills.length) sub.push("スキル：" + c.skills.join("、"));
-      if (c.tools.length) sub.push("ツール：" + c.tools.map((t) => toolOf(t).name).join("、"));
-      if (gap) sub.push("足りない：" + gap);
-      if (p == null && phases.length && (c.since || c.until)) sub.push("段階：" + phaseRange(c));
-      sub.forEach((x) => li.append(el("span", "sub", x)));
-      const ms = marksOf.get("check:" + c.key) || [];
-      if (ms.length) { const w = el("span", "sub"); ms.forEach((m) => w.append(markBadge(m, true), " ", m.text, " ")); li.append(w); }
-      ol.append(li);
+  // ---- 配置：すべての段階のノードで 1 回だけ ----
+  const L = 172, W = Math.max(1440, Math.ceil(L + stages.length * 155.5 + 24)), R = W - 24, CW = (R - L) / stages.length;
+  const GAP = 34, TW = CW - GAP, TH = 84, GY = 16, PAD = 28, TOP = 214;
+  const cells = groupBy(nodes, (n) => n.role + ":" + n.stage);
+  const P = new Map(), bands = [];
+  let gy = TOP;
+  roles.forEach((r) => {
+    const c = Math.max(1, ...stages.map((s) => (cells.get(r.id + ":" + s.id) || []).length));
+    const h = c * TH + (c - 1) * GY + PAD * 2;
+    bands.push({ y: gy, h, r });
+    stages.forEach((s, i) => {
+      const cl = cells.get(r.id + ":" + s.id) || [];
+      cl.forEach((n, k) => P.set(n.id, { x: L + i * CW + GAP / 2, y: gy + PAD + k * (TH + GY) + (c - cl.length) * (TH + GY) / 2 }));
     });
-    return ol;
-  };
-  let pop = null;
-  const closeChecks = () => { if (pop) { pop.remove(); pop = null; } };
-  const toggleChecks = (id) => {
-    // 開くのはカードの下の小さな窓だけ（右の詳細は開かない。同じ中身が2つ並ばないように）。
-    const was = pop && pop.dataset.nodeId === id; closeChecks(); select(id, true); if (was) return;
-    const n = byId.get(id), p = pos.get(id);
-    pop = el("div", "checks-pop"); pop.dataset.nodeId = id;
-    const live = n.checks.filter((c) => aliveAt(c, phase));
-    pop.append(el("h3", null, `中の検査（${live.length}）`), checksList(n, phase));
-    if (n.check) pop.append(el("div", "pop-foot", "通す条件：" + n.check));
-    Object.assign(pop.style, { left: p.x + "px", top: p.y + p.h + 6 + "px" });
-    pop.addEventListener("pointerdown", (ev) => ev.stopPropagation());
-    world.append(pop);
-  };
-
-  // 詳細
-  const detail = document.getElementById("detail");
-  const phaseRange = (o) => o.since || o.until ? `${o.since ? phases[phaseIx.get(o.since)].name : phases[0].name} から` + (o.until ? `（${phases[phaseIx.get(o.until)].name} で無くなる）` : "") : "すべての段階";
-  const select = (id, noDetail) => {
-    if (!id || (pop && pop.dataset.nodeId !== id)) closeChecks();
-    nodeEls.forEach((e, nid) => e.classList.toggle("selected", nid === id));
-    edgeEls.forEach(({ e, p }) => { const on = id && (e.from === id || e.to === id); p.classList.toggle("hl", !!on); p.setAttribute("marker-end", on ? "url(#arrowhl)" : "url(#arrow)"); });
-    selectedId = id; refreshEdges();
-    if (!id || noDetail) { detail.hidden = true; return; }
-    const n = byId.get(id);
-    const close = el("button", "close", "×"); close.onclick = () => select(null);
-    const dl = el("dl");
-    const item = (label, ...content) => { dl.append(el("dt", null, label)); const dd = el("dd"); content.forEach((c) => dd.append(typeof c === "string" ? el("span", null, c) : c)); dl.append(dd); };
-    const ms = marksOf.get("node:" + id) || [];
-    if (ms.length) item("注記" + (O && O.source ? "（" + str(O.source) + "）" : ""), ...ms.flatMap((m) => [markBadge(m, true), m.text]));
-    item("段", stageName(n.stage));
-    item("役割", roleName(n.role));
-    if (phases.length) item("段階", phaseRange(n));
-    item("セッション", sessionChip(n.session, n.auto));
-    item("層", layerChip(n.layer));
-    item("種類", KIND[n.kind] || "不明");
-    if (n.kind === "gate") item("戻しにくさ", riskChip(n.risk));
-    if (n.human) item("人", el("span", "chip humanflag", "人を置く関門"));
-    if (n.check) item(n.checks.length ? "通す条件" : "判定", n.check);
-    const st = stateAt(n, phase);
-    if (st.checks.length) item(`中の検査（${st.checks.length}）`, checksList(n, phase));
-    item("スキル", ...(n.skills.length ? n.skills.map((x) => el("span", "chip skill", x)) : ["無し"]));
-    item("ツール", ...(n.tools.length ? n.tools.map(toolBadge) : ["無し"]));
-    if (n.output) item("成果物", n.output);
-    const tag = (e) => (e.kind !== "data" ? `［${EDGE_KIND[e.kind]}］` : "") + (e.label ? `（${e.label}）` : "") + ((marksOf.get("edge:" + e.id) || []).length ? "［注記：" + marksOf.get("edge:" + e.id).map((m) => m.label + (m.text ? " " + m.text : "")).join("、") + "］" : "");
-    const ins = edges.filter((e) => e.to === id && edgeAlive(e)).map((e) => byId.get(e.from).title + tag(e));
-    const outs = edges.filter((e) => e.from === id && edgeAlive(e)).map((e) => byId.get(e.to).title + tag(e));
-    item("受け取る", ins.length ? ins.join("、") : "無し");
-    item("渡す", outs.length ? outs.join("、") : "無し");
-    if (n.note) item("メモ", n.note);
-    if (st.isGap) { const g = el("span", "gaptext", st.gap || ("欠けている：" + st.tags.join("、"))); item("足りないもの", g); }
-    detail.replaceChildren(close, el("h2", null, n.title), dl); detail.hidden = false;
-  };
-  nodeEls.forEach((e, id) => e.addEventListener("click", (ev) => { ev.stopPropagation(); select(id); }));
-
-  // ---- 表 ----
-  const sorted = nodes.slice().sort((a, b) => stageIx.get(a.stage) - stageIx.get(b.stage) || roleIx.get(a.role) - roleIx.get(b.role));
-  const table = el("table"), thead = el("tr");
-  ["段", "役割", "ノード", "種類", "スキル", "セッション", "ツール", "成果物", "層"].concat(phases.length ? ["段階"] : []).forEach((h) => thead.append(el("th", null, h)));
-  table.append(thead);
-  sorted.forEach((n) => {
-    const tr = el("tr", [-1].concat(phases.map((_, i) => i)).some((p) => stateAt(n, p).isGap) ? "gaprow" : "");
-    const cell = (...c) => { const td = el("td"); const r = el("div", "row"); c.forEach((x) => r.append(typeof x === "string" ? el("span", null, x) : x)); td.append(r); tr.append(td); return td; };
-    cell(stageName(n.stage)); cell(roleName(n.role));
-    const tc = cell(n.title); if (n.checks.length) tc.append(checksList(n));
-    cell(...[KIND[n.kind] || "—"].concat(n.kind === "gate" ? [riskChip(n.risk)] : [], n.human ? [el("span", "chip humanflag", "人")] : []));
-    // 赤い「無し」は、人の作業とコードには出さない。
-    cell(...(n.skills.length ? n.skills.map((x) => el("span", "chip skill", x)) : [n.skillless && !n.checks.length ? el("span", "chip gapflag", "無し") : "—"]));
-    cell(sessionChip(n.session, n.auto)); cell(...(n.tools.length ? n.tools.map(toolBadge) : ["—"])); cell(n.output || "—"); cell(layerChip(n.layer));
-    if (phases.length) cell(phaseRange(n));
-    table.append(tr);
+    gy += h;
   });
-  document.getElementById("tableDoc").replaceChildren(el("h2", null, "役割 × 段 × スキル × セッション × ツール"), table);
+  const GB = gy;
 
-  // ---- チケットの雛形 ----
-  const tt = str(D.ticket_template);
-  document.getElementById("ticketDoc").replaceChildren(el("h2", null, "チケットの雛形"), tt ? el("pre", "ticket", tt) : el("p", "empty", "設計にチケットの雛形がありません。"));
-
-  // ---- 足りないもの（選んでいる段階で数える。段階が無ければ全部） ----
-  const renderGaps = () => {
-    const ns = nodes.filter(nodeAlive), es = edges.filter(edgeAlive);
-    const st = new Map(ns.map((n) => [n.id, stateAt(n, phase)]));
-    const gaps = [];
-    stages.forEach((s) => { const inStage = ns.filter((n) => n.stage === s.id); if (!inStage.length) gaps.push(`段「${s.name}」にノードが無い`); else if (inStage.every((n) => st.get(n.id).isGap)) gaps.push(`段「${s.name}」に、スキルの決まったノードが無い`); });
-    // 検査だけが足りないノードは、下の検査ごとの行で出す。
-    ns.forEach((n) => { const x = st.get(n.id), tags = x.tags.filter((t) => !t.startsWith("足りない検査")); if (x.isGap && (x.gap || tags.length)) gaps.push(`${stageName(n.stage)} / ${roleName(n.role)} の「${n.title}」：${x.gap || "欠けている：" + tags.join("、")}`); });
-    ns.forEach((n) => st.get(n.id).checks.forEach((c) => { const g = gapAt(c, phase); if (g) gaps.push(`関門「${n.title}」の検査「${c.title}」：${g}`); }));
-    const task = ns.filter((n) => n.layer !== "upstream");
-    if (!es.some((e) => e.kind === "learn")) gaps.push("学びの辺が無い（評価から、分ける所の指示か上流へ戻す矢印）。速くはなっても、賢くならない");
-    if (!es.some((e) => e.kind === "fix")) gaps.push("直しの辺が無い（関門から、その単位を作った実行へ差し戻す矢印）");
-    const humans = ns.filter((n) => n.human);
-    if (humans.length !== 1) gaps.push(`人を置く関門が ${humans.length} か所（1か所、いちばん重くて戻しにくい所に置く）`);
-    task.filter((n) => n.session === "human" && !n.human).forEach((n) => gaps.push(`「${n.title}」：タスクの流れの途中に人がいる。人を置くのは1か所に絞る`));
-    ns.filter((n) => n.kind === "gate" && !RISK[n.risk]).forEach((n) => gaps.push(`関門「${n.title}」：戻しにくさが書かれていない`));
-    ns.filter((n) => n.kind === "gate" && n.risk === "irreversible" && !n.human).forEach((n) => gaps.push(`関門「${n.title}」：戻せない変更を、人を置かずに通している`));
-    ns.filter((n) => (n.kind === "work" || n.kind === "gate") && !n.check && !(st.get(n.id).checks.length && st.get(n.id).checks.every((c) => c.check))).forEach((n) => gaps.push(`「${n.title}」：判定（プログラムで評価できる形）が書かれていない`));
-    task.filter((n) => !KIND[n.kind]).forEach((n) => gaps.push(`「${n.title}」：ノードの種類（分ける・実行・コード・関門）が書かれていない`));
-    if (D.version == null) gaps.push("仕様書に version が無い（この図は version 2 の形として読んだ）");
-    else if (![1, 2].includes(Number(D.version))) gaps.push(`仕様書の version が ${D.version}（この図が読むのは version 1 と 2）`);
-    arr(D.gaps).forEach((g) => gaps.push(str(typeof g === "object" && g ? (g.text || g.title || JSON.stringify(g)) : g)));
-    problems.forEach((p) => gaps.push(p));
-    const ul = el("ul", "gaps"); gaps.forEach((g) => ul.append(el("li", null, g)));
-    const h = "足りないもの" + (phase >= 0 ? `（段階：${phases[phase].name}）` : "");
-    // 段階の説明（note）と、前の段階から何が変わったか。ヘッダーに足さず、このタブの本文に出す。
-    const about = [];
-    if (phase >= 0 && phases[phase].note) about.push(phases[phase].note);
-    if (phase > 0) {
-      const prev = nodes.filter((n) => aliveAt(n, phase - 1));
-      const added = ns.filter((n) => !aliveAt(n, phase - 1)), gone = prev.filter((n) => !nodeAlive(n)), changed = ns.filter((n) => changedAt(n, phase));
-      const part = (label, list) => list.length ? `${label}：${list.map((n) => n.card).join("、")}` : "";
-      const diff = [part("足す", added), part("無くす", gone), part("変わる", changed)].filter(Boolean);
-      about.push(`${phases[phase - 1].name}から ` + (diff.length ? diff.join("／") : "ノードの変わりは無い"));
+  // ---- 線の割り当て：すべての段階・すべての種類で 1 回だけ ----
+  const sameStage = (e) => byId.get(e.from).stage === byId.get(e.to).stage;
+  const fwd = (e) => stageIx.get(byId.get(e.from).stage) < stageIx.get(byId.get(e.to).stage);
+  const DATA = edges.filter((e) => e.kind === "data" && fwd(e));
+  const VERT = edges.filter((e) => e.kind === "data" && sameStage(e));
+  const BACK = edges.filter((e) => e.kind !== "data" || (!fwd(e) && !sameStage(e))); // 戻り道（と、前の段へ戻すデータの線）
+  groupBy(DATA, (e) => e.from).forEach((l) => { l.sort((a, b) => P.get(a.to).y - P.get(b.to).y || a.i - b.i); l.forEach((e, i) => { e.oy = (i - (l.length - 1) / 2) * 11; }); });
+  groupBy(DATA, (e) => e.to).forEach((l) => { l.sort((a, b) => P.get(a.from).y - P.get(b.from).y || a.i - b.i); l.forEach((e, i) => { e.iy = (i - (l.length - 1) / 2) * 11; }); });
+  groupBy(DATA, (e) => stageIx.get(byId.get(e.to).stage)).forEach((l) => { l.sort((a, b) => (P.get(a.from).y - P.get(b.from).y) || (P.get(a.to).y - P.get(b.to).y) || a.i - b.i); l.forEach((e, i) => { e.lane = (i - (l.length - 1) / 2) * 5; }); });
+  // 戻り道：元のカードの右の下から出て、右の隙間を下り、図の下の通り道を通り、戻り先のカードの下へ上がる
+  BACK.sort((a, b) => stageIx.get(byId.get(b.from).stage) - stageIx.get(byId.get(a.from).stage) || P.get(a.from).y - P.get(b.from).y || a.i - b.i);
+  BACK.forEach((e, i) => { e.ch = GB + 10 + i * 5; });
+  groupBy(BACK, (e) => e.from).forEach((l) => l.forEach((e, i) => { e.bo = i; }));
+  groupBy(BACK, (e) => e.to).forEach((l) => { l.sort((a, b) => P.get(b.from).x - P.get(a.from).x || a.i - b.i); l.forEach((e, i) => { e.bi = i; }); });
+  const H = Math.max(GB + 64, (BACK.length ? BACK[BACK.length - 1].ch : GB) + 30);
+  const rp = (pts, r = 9) => {
+    let d = "M" + pts[0];
+    for (let i = 1; i < pts.length - 1; i++) {
+      const [px, py] = pts[i - 1], [x, y] = pts[i], [nx, ny] = pts[i + 1];
+      const d1 = Math.min(r, Math.hypot(x - px, y - py) / 2), d2 = Math.min(r, Math.hypot(nx - x, ny - y) / 2);
+      d += ` L${x - Math.sign(x - px) * d1},${y - Math.sign(y - py) * d1} Q${x},${y} ${x + Math.sign(nx - x) * d2},${y + Math.sign(ny - y) * d2}`;
     }
-    document.getElementById("gapDoc").replaceChildren(el("h2", null, h), ...about.map((t) => el("p", null, t)), gaps.length ? ul : el("p", null, "見つかりませんでした。"));
-    const gc = document.getElementById("gapCount"); gc.textContent = gaps.length; gc.hidden = !gaps.length;
+    return d + " L" + pts[pts.length - 1];
+  };
+  const head = (x, y, dir) => dir === "r" ? `M${x - 6},${y - 3.5}L${x},${y}L${x - 6},${y + 3.5}` : dir === "d" ? `M${x - 3.5},${y - 6}L${x},${y}L${x + 3.5},${y - 6}` : `M${x - 3.5},${y + 6}L${x},${y}L${x + 3.5},${y + 6}`;
+  edges.forEach((e) => {
+    const a = P.get(e.from), b = P.get(e.to);
+    if (DATA.includes(e)) {
+      const x1 = a.x + TW, y1 = a.y + TH / 2 + e.oy, x2 = b.x - 1, y2 = b.y + TH / 2 + e.iy, mx = b.x - GAP / 2 + e.lane;
+      e.pts = Math.abs(y1 - y2) < 1 ? [[x1, y1], [x2, y2]] : [[x1, y1], [mx, y1], [mx, y2], [x2, y2]]; e.dir = "r";
+    } else if (VERT.includes(e)) {
+      const x = a.x + 28, down = b.y > a.y;
+      e.pts = down ? [[x, a.y + TH], [x, b.y - 1]] : [[x, a.y], [x, b.y + TH + 1]]; e.dir = down ? "d" : "u";
+    } else {
+      const x1 = a.x + TW, y1 = a.y + TH - 8 - e.bo * 6, xg = a.x + TW + 5 + e.bo * 4, xt = b.x + TW - 14 - e.bi * 9;
+      e.pts = [[x1, y1], [xg, y1], [xg, e.ch], [xt, e.ch], [xt, b.y + TH + 1]]; e.dir = "u"; e.back = true;
+    }
+    // 注記の札を置く所：いちばん長い横の線の真ん中
+    let best = null;
+    for (let i = 0; i < e.pts.length - 1; i++) { const [x, y] = e.pts[i], [nx, ny] = e.pts[i + 1]; if (y === ny && (!best || Math.abs(nx - x) > best.len)) best = { len: Math.abs(nx - x), x: (x + nx) / 2, y }; }
+    e.mp = best || { x: (e.pts[0][0] + e.pts[e.pts.length - 1][0]) / 2, y: (e.pts[0][1] + e.pts[e.pts.length - 1][1]) / 2 };
+  });
+
+  // ---- 主な道（a）：最初の段から最後の段までの、データの線の最長の道 ----
+  // データの線は戻り道ではないので、同じ段の中の矢印（worktree に配る → 実装 など）も道に入れる。輪にならないよう、たどっている途中のノードへは戻らない。
+  const mainPathAt = (p) => {
+    const alive = (n) => aliveAt(n, p);
+    const outE = groupBy(edges.filter((e) => e.kind === "data" && (fwd(e) || sameStage(e)) && aliveAt(e, p) && alive(byId.get(e.from)) && alive(byId.get(e.to))), (e) => e.from);
+    const lastSt = stages[stages.length - 1].id, memo = new Map(), onPath = new Set();
+    const lg = (id) => {
+      if (memo.has(id)) return memo.get(id);
+      onPath.add(id);
+      let best = null;
+      for (const e of outE.get(id) || []) { if (onPath.has(e.to)) continue; const r = lg(e.to); if (r && (!best || r.length + 1 > best.length)) best = [e, ...r]; }
+      if (!best && byId.get(id).stage === lastSt) best = [];
+      onPath.delete(id);
+      memo.set(id, best); return best;
+    };
+    let mp = [];
+    nodes.filter((n) => alive(n) && stageIx.get(n.stage) === 0).forEach((n) => { const r = lg(n.id); if (r && r.length > mp.length) mp = r; });
+    return new Set(mp.map((e) => e.id));
   };
 
-  // ---- 段階の切り替え（既定は最後の段階＝目指す形。「全部」はすべてを重ねて出す） ----
-  // 前の段階から変わったか：ノードの有無は同じでも、中の検査・足りないもの・矢印が変われば変わったとみなす。
-  // 矢印は、両端のノードが前の段階にも在るものだけを見る（新しいノードにつながる矢印では、相手を「変わる」にしない）。
-  const sigAt = (n, p) => JSON.stringify([stateAt(n, p).checks.map((c) => c.key + ":" + gapAt(c, p)), gapAt(n, p)]);
-  const changedAt = (n, p) => p > 0 && aliveAt(n, p - 1) && aliveAt(n, p) && (sigAt(n, p) !== sigAt(n, p - 1) ||
-    edges.some((e) => (e.from === n.id || e.to === n.id) && [e.from, e.to].every((id) => aliveAt(byId.get(id), p) && aliveAt(byId.get(id), p - 1)) && aliveAt(e, p) !== aliveAt(e, p - 1)));
-  const refreshPhase = () => {
-    closeChecks();
+  // ---- 描画：図の骨組みは 1 回だけ作る ----
+  const svg = sv("svg", { id: "v", tabindex: -1, role: "group", "aria-label": "流れの図（矢印キーでカードを移り、Enter で詳細を開く）", preserveAspectRatio: "xMinYMin meet" }, wrap);
+  const defs = sv("defs", {}, svg);
+  const fl = sv("filter", { id: "sh", x: "-10%", y: "-10%", width: "120%", height: "130%" }, defs);
+  sv("feDropShadow", { dx: 0, dy: 1, stdDeviation: 1.6, "flood-color": "#5a4a30", "flood-opacity": 0.08 }, fl);
+  const lay = {};
+  ["bg", "dyn", "back", "thin", "main", "card", "top"].forEach((k) => { lay[k] = sv("g", { "data-layer": k }, svg); });
+  const hl1 = tx(lay.bg, 40, 72, "", { "font-weight": 600, fill: HEADC, "font-family": GOTH, "aria-hidden": "true" });
+  const hl2 = tx(lay.bg, 40, 102, "", { "font-size": 13, fill: SUB, "font-family": GOTH, "aria-hidden": "true" });
+  stages.forEach((s, i) => {
+    const x = L + i * CW + GAP / 2, g = sv("g", { "data-stage-id": s.id }, lay.bg);
+    tx(g, x, TOP - 30, String(i + 1), { "font-size": 19, "font-weight": 600, fill: "#5d5850", "font-family": GOTH });
+    tx(g, x + (i + 1 >= 10 ? 28 : 18), TOP - 30, s.name, { "font-size": 13, "font-weight": 600, fill: "#4a4642", "font-family": GOTH });
+  });
+  sv("line", { x1: 40, y1: TOP - 1, x2: R, y2: TOP - 1, stroke: RULE }, lay.bg);
+  const roleLabels = [];
+  bands.forEach((b, k) => {
+    const g = sv("g", { "data-role-id": b.r.id }, lay.bg);
+    if (k % 2) sv("rect", { x: 40, y: b.y, width: R - 40, height: b.h, rx: 14, fill: ALT }, g);
+    tx(g, 52, b.y + PAD + 18, b.r.name, { "font-size": 12.5, "font-weight": 600, fill: "#4a4642", "font-family": GOTH });
+    const sub = b.r.actor === "agent" ? "エージェント" : b.r.actor === "auto" ? "自動" : Number(b.r.people) > 0 ? b.r.people + " 人" : "";
+    if (sub) tx(g, 52, b.y + PAD + 38, sub, { "font-size": 12, fill: SUB, "font-family": GOTH });
+    if (b.r.missing) roleLabels.push(tx(g, 52, b.y + PAD + 56, "設計に無い役割", { "font-size": 11, fill: GAPINK, "font-family": GOTH }));
+  });
+  // 線
+  edges.forEach((e) => {
+    e.g = sv("g", { "data-edge-id": e.id }, e.back ? lay.back : lay.thin);
+    e.line = sv("path", { d: rp(e.pts, e.back ? 6 : 9), fill: "none" }, e.g);
+    e.head = sv("path", { d: head(e.pts[e.pts.length - 1][0], e.pts[e.pts.length - 1][1], e.dir), fill: "none" }, e.g);
+    const ms = mk("edge:" + e.id);
+    if (ms.length) {
+      e.mark = sv("g", { "data-edge-id": e.id }, lay.top);
+      const t = "✎ " + ms[0].label + (ms.length > 1 ? " ＋" + (ms.length - 1) : ""), wd = t.length * 10 + 12;
+      sv("rect", { x: e.mp.x - wd / 2, y: e.mp.y - 8, width: wd, height: 15, rx: 4, fill: "#fff", stroke: "#cfc7ba", "stroke-width": 0.9 }, e.mark);
+      tx(e.mark, e.mp.x, e.mp.y + 3.5, t, { "font-size": 10, fill: "#5d5850", "text-anchor": "middle", "font-family": GOTH });
+      sv("title", {}, e.mark).textContent = ms.map(markLine).join("\n");
+    }
+  });
+  // カード
+  const room = TW - 19;
+  const fitText = (t, s, tail = "") => { // 収まらなければ … で切る（字を縮めない）。tail（「 +1」など）は残す
+    t.textContent = s + tail;
+    if (t.getComputedTextLength() <= room) return;
+    let s2 = s;
+    while (s2.length > 1 && t.getComputedTextLength() > room) { s2 = s2.slice(0, -1); t.textContent = s2.replace(/[。、・（\s]+$/, "") + "…" + tail; }
+  };
+  // 2 行に折る位置：収まる長さ（cut）までで、助詞・空白・「・」の後ろか、文字の種類が変わる所のいちばん後ろ。無ければ cut。
+  const kindOf = (ch) => /[ぁ-ゖ]/.test(ch) ? "h" : /[ァ-ヺー]/.test(ch) ? "k" : /[一-龯々]/.test(ch) ? "c" : /[A-Za-z0-9_\-]/.test(ch) ? "a" : "o";
+  const breakAt = (s, cut) => {
+    let soft = 0, kind = 0;
+    for (let k = 1; k <= cut && k < s.length; k++) {
+      if ("のにをでとへがは・、 ".includes(s[k - 1]) || s[k] === " ") soft = k;
+      if (kindOf(s[k - 1]) !== kindOf(s[k])) kind = k;
+    }
+    const k = soft >= cut * 0.3 ? soft : kind >= cut * 0.3 ? kind : cut;
+    return k;
+  };
+  nodes.forEach((n) => {
+    const { x, y } = P.get(n.id);
+    const g = sv("g", { class: "card", "data-node-id": n.id, role: "button", tabindex: -1, "aria-haspopup": "dialog", "aria-expanded": "false" }, lay.card);
+    sv("rect", { class: "focus", x: x - 7, y: y - 7, width: TW + 14, height: TH + 14, rx: 15, fill: "none", stroke: INK, "stroke-width": 2, "stroke-dasharray": "2 2" }, g);
+    n.ring = sv("rect", { x: x - 5, y: y - 5, width: TW + 10, height: TH + 10, rx: 14, fill: "none", stroke: "#4a4642", "stroke-width": 1.6 }, g);
+    n.frame = sv("rect", { x, y, width: TW, height: TH, rx: 10 }, g);
+    n.badge = sv("g", {}, g); n.badgeR = sv("rect", { y: y + 9, height: 17, rx: 8.5 }, n.badge); n.badgeT = tx(n.badge, 0, y + 21.5, "", { "font-size": 11, "text-anchor": "middle", "font-family": GOTH });
+    n.tl = tx(g, x + 13, y + 21, "", { "font-size": 10.5, "font-family": GOTH });
+    n.nm = tx(g, x + 13, y + 48, "", { "font-size": 17, "font-weight": 700, fill: INK, "font-family": GOTH });
+    n.sub = tx(g, x + 13, y + 68, "", { "font-size": 11, "font-family": GOTH });
+    n.dots = sv("g", {}, g);
+    n.checks.forEach((c, i) => { c.dot = sv("circle", { "data-check-id": c.key, cy: y + 17, r: 2.8 }, n.dots); });
+    n.marksG = sv("g", {}, g);
+    const ms = mk("node:" + n.id), cms = n.checks.flatMap((c) => mk("check:" + c.key));
+    const tagT = ms.length ? ms[0].label + (ms.length > 1 ? " ＋" + (ms.length - 1) : "") : cms.length ? "検査に注記 " + cms.length : "";
+    if (tagT) {
+      const t = "✎ " + tagT, wd = t.length * 10 + 20, mx = x + TW - wd - 8, my = y + TH - 7;
+      sv("rect", { x: mx, y: my, width: wd, height: 15, rx: 4, fill: "#fff", stroke: "#cfc7ba", "stroke-width": 0.9 }, n.marksG);
+      tx(n.marksG, mx + wd / 2, my + 11, t, { "font-size": 10, fill: "#5d5850", "text-anchor": "middle", "font-family": GOTH });
+    }
+    n.muted = ms.length > 0 && ms.every((m) => m.level === "muted");
+    n.g = g;
+    // カードの名前は 17（1440×900 でどの見方でも 14px 以上）。1 行に収まらなければ 2 行にし、それでも収まらなければ … で切る。
+    n.nm.textContent = n.card;
+    if (n.nm.getComputedTextLength() <= room) n.lines = [n.card];
+    else {
+      const s = n.card; let cut = 1;
+      for (let k = 1; k < s.length; k++) { n.nm.textContent = s.slice(0, k); if (n.nm.getComputedTextLength() <= room) cut = k; else break; }
+      cut = breakAt(s, cut);
+      n.nm.textContent = s.slice(cut).trim(); fitText(n.nm, s.slice(cut).trim());
+      n.lines = [s.slice(0, cut).trim(), n.nm.textContent];
+    }
+    n.nm.textContent = "";
+    n.lines.forEach((ln) => { const t = sv("tspan", { x: x + 13 }, n.nm); t.textContent = ln; });
+  });
+
+  // ---- 状態 ----
+  const CUR = Math.max(0, phases.findIndex((ph) => ph.current));
+  const S = { view: "a", p: NP - 1, sel: null, selList: null, ck: null, gap: null, table: false };
+  const effP = () => (S.view === "a" ? NP - 1 : S.view === "b" ? CUR : S.p);
+  const VB = () => (S.view === "a" ? [0, W] : [32, W - 48]);
+
+  // ---- 見出しの文（見方ごとの規則。手で書いた文にしない） ----
+  const headline = (view, p, G, df) => {
+    const ns = nodes.filter((n) => aliveAt(n, p));
+    if (view === "a") {
+      const HN = ns.filter((n) => INV(n, p) === "human"), Cn = ns.filter((n) => INV(n, p) === "cond");
+      // 入力のまとまり：group が input の段。group の無い仕様書では、ノードがすべて上流の段。
+      const hasG = stages.some((s) => s.group);
+      const inSt = stages.filter((s) => { const ins = ns.filter((n) => n.stage === s.id); return hasG ? s.group === "input" : ins.length && ins.every((n) => n.layer === "upstream"); }).map((s) => s.id);
+      const inAll = inSt.length > 0 && inSt.every((s) => { const ins = ns.filter((n) => n.stage === s); return ins.length && ins.every((n) => INV(n, p) === "human"); });
+      const items = [
+        ...triggers.filter((t) => t.by === "human" && aliveAt(byId.get(t.to), p) && t.label).map((t) => t.label),
+        ...(inAll ? ["入力の " + inSt.length + " 段"] : []),
+        ...uniq(HN.filter((n) => !(inAll && inSt.includes(n.stage))).map((n) => stName(n.stage))),
+      ];
+      const cst = uniq(Cn.map((n) => stName(n.stage)));
+      const h = stages[0].name + "から" + stages[stages.length - 1].name + "まで " + stages.length + " 段。" +
+        (items.length ? "人がやるのは" + uniq(items).join("と") + (cst.length ? "、" + cst.join("・") + "は条件で人" : "") + "。" : cst.length ? "人は" + cst.join("・") + "で条件つきで関わる。" : "人は関わらない。");
+      const cnt = (k) => ns.filter((n) => INV(n, p) === k).length;
+      return [h, [teamLine, phName(p), `カード ${ns.length} 枚：人 ${cnt("human")}・条件で人 ${cnt("cond")}・エージェント ${cnt("agent")}・自動 ${cnt("auto")}`].filter(Boolean).join("　")];
+    }
+    if (view === "b") {
+      const at = phases.length ? "今の段階「" + phName(p) + "」で判定。" : "";
+      const l = G.list;
+      if (!l.length) return [(phases.length ? "今の段階「" + phName(p) + "」で" : "") + "足りないものは無い。", at + "　" + teamLine];
+      const t = l[0], nm = t.nodes.length ? "「" + t.nodes.map(short).join("・") + "」" : gapWho(t);
+      return ["次に直すのは" + nm + "：" + t.text.split("。")[0] + (t.checkTitles.length > 1 ? "（" + t.checkTitles.join("・") + "）" : "") + "。",
+        at + "足りないもの " + l.length + " 件（重さの順に右の一覧）　" + teamLine];
+    }
+    if (!phases.length) return ["移行の段階は書かれていない。", "仕様書に phases を書くと、今から目指す形までの段階をここで切り替えて見られる。　" + teamLine];
+    const names = (ids) => ids.length <= 2 ? ids.map(short).join("・") : short(ids[0]) + " ほか " + (ids.length - 1) + " つ";
+    const parts = [];
+    df.rep.forEach((r) => parts.push(r.from.map(short).join("・") + "を" + r.to.map(short).join("・") + "に置き換える"));
+    if (df.add.length) parts.push(names(df.add) + "を足す");
+    if (df.rem.length) parts.push(names(df.rem) + "を無くす");
+    if (df.chg.length) parts.push(names(df.chg.map((c) => c.id)) + "が変わる");
+    if (df.edges.length) parts.push("線 " + df.edges.length + " 本が" + (df.edges.every((x) => !x.added) ? "無くなる" : df.edges.every((x) => x.added) ? "増える" : "変わる"));
+    const sent = p === 0 ? "今の流れ（ここから始める）" : parts.length ? parts.join("、") : "変わるものは無い";
+    return [phName(p) + "：" + sent + "。", [phases[p].note, "足りないもの " + G.list.length + " 件", teamLine].filter(Boolean).join("　")];
+  };
+
+  // ---- 見方・段階・選びを描く（カードと線は出す・隠すだけ） ----
+  const live = document.getElementById("live"), hlEl = document.getElementById("headline");
+  let lastSpoken = "";
+  const render = () => {
+    const view = S.view, p = effP();
+    const G = gapsAt(p), df = diffAt(p), first = new Set(G.list.length ? G.list[0].nodes : []);
+    const firstChecks = new Set(G.list.length ? G.list[0].checks : []);
+    const alive = (n) => aliveAt(n, p);
+    const ghost = (n) => view === "c" && p > 0 && !alive(n) && aliveAt(n, p - 1);
+    const [vx, vw] = VB();
+    svg.setAttribute("viewBox", `${vx} 0 ${vw} ${H}`);
+    document.body.dataset.view = view;
+    // 表を開いているかを先に決める（隠れた図では字の長さを測れない）
+    document.body.toggleAttribute("data-table", S.table);
+    document.getElementById("table").hidden = !S.table;
+    wrap.hidden = S.table; document.getElementById("panel").style.visibility = S.table ? "hidden" : "";
+    document.getElementById("tableBtn").setAttribute("aria-pressed", String(S.table));
+    document.querySelectorAll("#views [role=tab]").forEach((b) => { const on = b.dataset.v === view; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; });
+    wrap.setAttribute("aria-labelledby", "tab-" + view);
+
+    // 見出し
+    const [h1, h2] = headline(view, p, G, df);
+    hl1.textContent = h1; hl1.setAttribute("font-size", view === "a" ? 25 : 23);
+    for (let fs = view === "a" ? 25 : 23; fs > 16 && hl1.getComputedTextLength() > vw - 330; fs -= 1) hl1.setAttribute("font-size", fs - 1);
+    hl2.textContent = h2; hlEl.textContent = h1;
+    const spoken = view + ":" + p;
+    if (spoken !== lastSpoken) { live.textContent = h1; lastSpoken = spoken; }
+
+    // その時々の飾り（触れない）：段の上のまとまり（a）、きっかけ（a）、戻る先の文字（b）
+    lay.dyn.replaceChildren(); lay.top.querySelectorAll(".dyn").forEach((x) => x.remove());
+    if (view === "a") {
+      let i = 0;
+      while (i < stages.length) {
+        const gname = stages[i].group; let j = i;
+        while (j + 1 < stages.length && stages[j + 1].group === gname) j++;
+        if (GROUP[gname]) {
+          const x1 = L + i * CW + GAP / 2, x2 = L + (j + 1) * CW - GAP / 2, c = "#cfc7ba";
+          sv("line", { x1, y1: TOP - 60, x2, y2: TOP - 60, stroke: c }, lay.dyn); sv("line", { x1, y1: TOP - 64, x2: x1, y2: TOP - 56, stroke: c }, lay.dyn); sv("line", { x1: x2, y1: TOP - 64, x2, y2: TOP - 56, stroke: c }, lay.dyn);
+          tx(lay.dyn, x1 + 8, TOP - 68, GROUP[gname], { "font-size": 12, "letter-spacing": ".12em", fill: "#8a8378", "font-family": GOTH });
+        }
+        i = j + 1;
+      }
+      triggers.forEach((t) => {
+        const n = byId.get(t.to); if (!alive(n)) return;
+        const pp = P.get(t.to), x = pp.x + 24, hu = t.by === "human", g = sv("g", { class: "dyn" }, lay.top);
+        sv("path", { d: `M${x},${pp.y - 24}V${pp.y - 2}`, stroke: "#8a8378", "stroke-width": 1.2, fill: "none" }, g);
+        sv("path", { d: head(x, pp.y - 2, "d"), stroke: hu ? HUM : "#8a8378", "stroke-width": 1.6, fill: "none" }, g);
+        sv("circle", { cx: x, cy: pp.y - 25, r: 2.2, fill: "#8a8378" }, g);
+        const who = hu ? (roleIx.has(t.role) ? roName(t.role) : "人") + "が渡す：" : t.by === "schedule" ? "定期：" : "イベント：";
+        tx(g, x + 9, pp.y - 12, who + t.label, { "font-size": 11.5, "font-weight": hu ? 600 : 400, fill: hu ? "#4a4642" : SUB, "font-family": GOTH });
+      });
+    }
+    const liveE = (e) => aliveAt(e, p) && alive(byId.get(e.from)) && alive(byId.get(e.to));
+    if (view === "b") {
+      groupBy(edges.filter((e) => e.kind !== "data" && liveE(e)), (e) => e.to).forEach((l, to) => {
+        const b = P.get(to), kinds = uniq(l.map((e) => e.kind));
+        const t = kinds.map((k) => { const c = l.filter((e) => e.kind === k).length; return EDGE_KIND[k] + (c > 1 ? " " + c : ""); }).join("・");
+        const maxBi = Math.max(...BACK.filter((e) => e.to === to).map((e) => e.bi));
+        tx(lay.dyn, b.x + TW - 14 - maxBi * 9 - 8, b.y + TH + 15, "戻る：" + t, { "font-size": 10.5, fill: "#7d7468", "text-anchor": "end", "font-family": GOTH });
+      });
+    }
+
+    // 線
+    const main = view === "a" ? mainPathAt(p) : new Set();
+    const selIds = new Set([S.sel, ...(S.selList || [])].filter(Boolean));
+    const addedE = new Set(view === "c" ? df.edges.filter((x) => x.added).map((x) => x.e.id) : []);
+    const goneE = new Set(view === "c" ? df.edges.filter((x) => !x.added).map((x) => x.e.id) : []);
+    edges.forEach((e) => {
+      let show, col = "#bdb4a6", w = 1, dash = null, layer = lay.thin;
+      if (e.kind !== "data") {
+        show = view === "b" && liveE(e) && (selIds.has(e.from) || selIds.has(e.to));
+        col = "#7d7468"; w = 1.1; dash = e.kind === "fix" ? "5 3" : "1.5 3"; layer = lay.back;
+      } else if (goneE.has(e.id)) { show = true; col = "#a39a8c"; w = 1.2; dash = "2 3"; }
+      else {
+        show = liveE(e);
+        if (main.has(e.id) || addedE.has(e.id)) { col = main.has(e.id) ? "#6e665b" : "#4a4642"; w = 1.8; layer = lay.main; }
+      }
+      e.g.style.display = show ? "" : "none";
+      if (e.g.parentNode !== layer) layer.append(e.g);
+      e.g.classList.toggle("route", !!(show && e.kind !== "data"));
+      [e.line, e.head].forEach((x) => { x.setAttribute("stroke", col); x.setAttribute("stroke-width", w); });
+      if (dash) e.line.setAttribute("stroke-dasharray", dash); else e.line.removeAttribute("stroke-dasharray");
+      if (e.mark) e.mark.style.display = show && view !== "c" && !goneE.has(e.id) ? "" : "none";
+    });
+
+    // カード
+    roleLabels.forEach((t) => { t.style.display = view === "b" ? "" : "none"; });
     nodes.forEach((n) => {
-      const d = nodeEls.get(n.id), b = n._phaseBadge;
-      d.classList.toggle("off", !nodeAlive(n));
-      fillCard(n, phase);
-      let txt = "", cls = "";
-      if (phases.length && phase >= 0) {
-        if (n.since && phaseIx.get(n.since) === phase && phase > 0) { txt = "＋ この段階で足す"; cls = "new"; }
-        else if (changedAt(n, phase)) { txt = "◇ この段階で変わる"; cls = "chg"; }
-        else if (n.until && phaseIx.get(n.until) === phase + 1) { txt = "次の段階で無くなる"; cls = "end"; }
-      } else if (phases.length && (n.since || n.until)) { txt = phaseRange(n); cls = n.until ? "end" : "new"; }
-      b.textContent = txt; b.hidden = !txt; b.className = "mark phase " + cls;
+      const gh = ghost(n), shown = alive(n) || gh;
+      n.g.style.display = shown ? "" : "none";
+      n.shown = shown;
+      if (!shown) return;
+      const { x, y } = P.get(n.id), inv = INV(n, gh ? p - 1 : p), sg = G.st.get(n.id);
+      const gapB = view === "b" && sg && sg.isGap, isFirst = gapB && first.has(n.id);
+      const sel = selIds.has(n.id);
+      n.ring.style.display = sel ? "" : "none";
+      n.g.setAttribute("aria-expanded", String(S.sel === n.id && !tip.hidden));
+      n.g.style.opacity = n.muted && view !== "c" ? 0.5 : "";
+      n.badge.style.display = "none"; n.dots.style.display = "none"; n.sub.textContent = ""; n.sub.removeAttribute("textLength"); n.sub.removeAttribute("lengthAdjust"); n.tl.textContent = "";
+      n.marksG.style.display = view === "c" || gh ? "none" : "";
+      let label = [n.card, INVL[inv], "段 " + (stageIx.get(n.stage) + 1) + "「" + stName(n.stage) + "」", roName(n.role)];
+      if (gh) {
+        n.frame.setAttribute("fill", "none"); n.frame.setAttribute("stroke", "#b8b0a3"); n.frame.setAttribute("stroke-width", 1); n.frame.setAttribute("stroke-dasharray", "3 3"); n.frame.removeAttribute("filter");
+        n.tl.textContent = "無くなる"; n.tl.setAttribute("fill", SUB); n.tl.setAttribute("font-weight", 400);
+        n.nm.setAttribute("fill", "#a39a8c"); n.nm.setAttribute("text-decoration", "line-through");
+        label.push("この段階で無くなる");
+      } else {
+        const hu = inv === "human", cd = inv === "cond", au = inv === "auto";
+        let stroke = hu || cd ? HUM : au ? "#b8b0a3" : "#e6e1d8", dash = au ? "4 3" : cd ? "5 3" : null, sw = hu || cd ? 1.2 : 1;
+        if (gapB) { stroke = isFirst ? RED : GAPINK; dash = "5 3"; sw = 1.4; }
+        n.frame.setAttribute("fill", au ? BG : "#fff"); n.frame.setAttribute("stroke", stroke); n.frame.setAttribute("stroke-width", sw);
+        if (dash) n.frame.setAttribute("stroke-dasharray", dash); else n.frame.removeAttribute("stroke-dasharray");
+        if (au) n.frame.removeAttribute("filter"); else n.frame.setAttribute("filter", "url(#sh)");
+        n.nm.setAttribute("fill", INK); n.nm.removeAttribute("text-decoration");
+        // 右上の札：人の関わり（a だけ。b・c は人の枠の色だけ残す）
+        if (view === "a") {
+          const lb = INVL[inv], lw = lb.length * 11 + 14, lx = x + TW - lw - 8;
+          n.badge.style.display = "";
+          n.badgeR.setAttribute("x", lx); n.badgeR.setAttribute("width", lw);
+          n.badgeR.setAttribute("fill", hu ? HUMBG : cd ? "#fff" : au ? "none" : AGBG);
+          n.badgeR.setAttribute("stroke", cd ? HUM : "none"); n.badgeR.setAttribute("stroke-width", 0.9);
+          if (cd) n.badgeR.setAttribute("stroke-dasharray", "3 2"); else n.badgeR.removeAttribute("stroke-dasharray");
+          n.badgeT.setAttribute("x", lx + lw / 2); n.badgeT.textContent = lb;
+          n.badgeT.setAttribute("fill", hu || cd ? HUMTX : au ? "#958e83" : AGTX); n.badgeT.setAttribute("font-weight", au ? 400 : 600);
+        }
+        // 左上：b は関門の戻しにくさ、c は段階での変化
+        if (view === "b" && n.kind === "gate") {
+          n.tl.textContent = RISKS[n.risk] || "戻しにくさ？"; n.tl.setAttribute("fill", n.risk === "irreversible" ? INK : SUB); n.tl.setAttribute("font-weight", n.risk === "irreversible" ? 700 : 400);
+        }
+        if (view === "c") {
+          const t = df.add.includes(n.id) ? "＋ 足す" : df.rep.some((r) => r.to.includes(n.id)) ? "⇄ 置き換え" : df.chg.some((c) => c.id === n.id) ? "△ 変わる" : "";
+          n.tl.textContent = t; n.tl.setAttribute("fill", INK); n.tl.setAttribute("font-weight", 700);
+          if (t) label.push("この段階で" + changeOf(df, n.id));
+        }
+        // 名前の下の 1 行：b の足りないものの理由、条件で人の条件の文、スキル名
+        const cond = condAt(n, p);
+        if (gapB) {
+          const t = sg.gap || (sg.tags.length ? sg.tags.join("、") : "足りない検査 " + sg.checkGaps.length);
+          n.sub.setAttribute("fill", isFirst ? RED : GAPINK); n.sub.setAttribute("font-weight", 600); n.sub.setAttribute("font-family", GOTH);
+          fitText(n.sub, t);
+          label.push("足りない：" + G.list.filter((o) => o.nodes.includes(n.id)).map(gapText).join("／"));
+        } else if (cond) {
+          n.sub.setAttribute("fill", SUB); n.sub.setAttribute("font-weight", 400); n.sub.setAttribute("font-family", GOTH); fitText(n.sub, cond);
+          label.push("条件：" + cond);
+        } else if (n.skills.length) {
+          n.sub.setAttribute("fill", SUB); n.sub.setAttribute("font-weight", 400); n.sub.setAttribute("font-family", MONO);
+          // スキル名は、どこで何が動くかを示すので切らない。収まらなければ字の幅を詰めて枠の中に収める
+          n.sub.textContent = n.skills[0] + (n.skills.length > 1 ? " +" + (n.skills.length - 1) : "");
+          if (n.sub.getComputedTextLength() > room) { n.sub.setAttribute("textLength", room); n.sub.setAttribute("lengthAdjust", "spacingAndGlyphs"); }
+        }
+        // b：関門の中の検査の点（右上。灰＝自動・エージェント、人の色＝人、足りない検査は 1 位なら赤、ほかは濃い灰の白抜き）
+        if (view === "b" && n.kind === "gate") {
+          const cks = n.checks.filter((c) => aliveAt(c, p));
+          n.dots.style.display = "";
+          n.checks.forEach((c) => { c.dot.style.display = "none"; });
+          cks.forEach((c, i) => {
+            const gp = textAt(c.gaps, p), cx = x + TW - 12 - (cks.length - 1 - i) * 8;
+            c.dot.style.display = ""; c.dot.setAttribute("cx", cx);
+            c.dot.setAttribute("fill", gp ? (firstChecks.has(c.key) ? RED : "#fff") : c.session === "human" ? HUM : "#b8b0a3");
+            c.dot.setAttribute("stroke", gp && !firstChecks.has(c.key) ? GAPINK : "none"); c.dot.setAttribute("stroke-width", 1.2);
+            c.dot.setAttribute("r", S.ck && S.ck.includes(c.key) ? 3.6 : 2.8);
+          });
+        }
+      }
+      // 名前の位置（1 行か 2 行か、下の 1 行があるか）
+      const hasSub = !!n.sub.textContent, two = n.lines.length > 1;
+      const ys = two ? (hasSub ? [42, 61] : [46, 65]) : [hasSub ? 48 : 52];
+      [...n.nm.children].forEach((t, i) => t.setAttribute("y", y + ys[i]));
+      n.sub.setAttribute("y", y + (two ? 77 : 68));
+      n.g.setAttribute("aria-label", label.join("、"));
     });
-    document.querySelectorAll("#phases button").forEach((x) => x.setAttribute("aria-pressed", String(Number(x.dataset.phase) === phase)));
-    if (selectedId && !nodeAlive(byId.get(selectedId))) select(null); else if (selectedId) select(selectedId, detail.hidden);
-    refreshEdges(); renderGaps();
-  };
-  if (phases.length) {
-    const box = document.getElementById("phases"); box.hidden = false; box.append(el("span", null, "段階："));
-    phases.map((p, i) => [p.name, i]).concat([["全部", -1]]).forEach(([name, i]) => {
-      const b = el("button", null, name); b.type = "button"; b.dataset.phase = i; if (i >= 0 && phases[i].note) b.title = phases[i].note;
-      b.addEventListener("click", () => { phase = i; refreshPhase(); }); box.append(b);
-    });
-  }
-  refreshPhase();
+    const vis = nodes.filter((n) => n.shown);
+    // 図の中で Tab が止まる 1 枚：選んだカード、b なら 1 位のカード、ほかは読む順の最初
+    if (!vis.some((n) => n.id === figStop)) figStop = (vis.find((n) => selIds.has(n.id)) || vis.find((n) => view === "b" && first.has(n.id)) || readingOrder(vis)[0] || {}).id || null;
+    nodes.forEach((n) => { n.g.tabIndex = n.id === figStop ? 0 : -1; });
 
-  // ---- タブ ----
-  document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => {
-    document.querySelectorAll("nav button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-    document.querySelectorAll("main > section").forEach((sec) => { sec.hidden = sec.id !== b.dataset.tab; });
-    if (b.dataset.tab === "canvasView") home();
-  }));
-  home();
-  window.addEventListener("resize", home);
+    renderPanel(G, df);
+    renderTip();
+    renderFold();
+  };
+
+  // ---- 横の一覧（b・c）：listbox ----
+  const panel = document.getElementById("panel");
+  const fold = el("button", null, "一覧をたたむ"); fold.id = "fold"; fold.type = "button"; fold.setAttribute("aria-controls", "panel");
+  fold.addEventListener("click", () => { document.body.toggleAttribute("data-fold"); renderFold(); placeTip(); });
+  const listbox = (label, id) => { const lb = el("div"); lb.setAttribute("role", "listbox"); lb.setAttribute("aria-label", label); lb.id = id; return lb; };
+  const option = (cls, key, selected, onPick) => {
+    const o = el("div", cls); o.setAttribute("role", "option"); o.dataset.key = key; o.setAttribute("aria-selected", String(!!selected)); o.tabIndex = -1;
+    o.addEventListener("click", () => { onPick(); });
+    o._pick = onPick;
+    return o;
+  };
+  const rove = (lb) => { const os = [...lb.querySelectorAll("[role=option]")]; if (!os.length) return; (os.find((o) => o.getAttribute("aria-selected") === "true") || os[0]).tabIndex = 0; };
+  const renderPanel = (G, df) => {
+    const act = document.activeElement, keep = act && act.closest && act.closest("#panel [role=listbox]") ? [act.closest("[role=listbox]").id, act.dataset.key] : null;
+    panel.replaceChildren(fold);
+    const view = S.view, p = effP();
+    if (view === "a") return;
+    if (view === "b") {
+      panel.append(el("h2", null, "足りないもの（重さの順）"), el("p", "sub", (phases.length ? "今の段階「" + phName(p) + "」で判定（ほかの段階は「移行」で見る）。" : "") + "押すと図のカードと、その戻り道を出す。"));
+      const lb = listbox("足りないもの（重さの順）", "gapList");
+      let grp = null, last = 0;
+      G.list.forEach((o, i) => {
+        if (o.tier !== last) { grp = el("div"); grp.setAttribute("role", "group"); const t = el("div", "tier", TIER[o.tier]); t.id = "tier" + o.tier; grp.setAttribute("aria-labelledby", t.id); grp.append(t); lb.append(grp); last = o.tier; }
+        const op = option("g" + (i === 0 ? " first" : ""), o.key, S.gap === o.key, () => { S.gap = o.key; S.selList = o.nodes.slice(); S.sel = o.nodes[0] || null; S.ck = o.checks.length ? o.checks.slice() : null; sync(); });
+        op.append(el("b", null, gapWho(o)), el("span", null, gapText(o)));
+        op.setAttribute("aria-label", (i === 0 ? "次に直す。" : "") + gapWho(o) + "：" + gapText(o));
+        grp.append(op);
+      });
+      if (!G.list.length) panel.append(el("p", "sub", "足りないものは無い。"));
+      else { rove(lb); panel.append(lb); }
+    } else {
+      if (!phases.length) { panel.append(el("h2", null, "段階"), el("p", "sub", "仕様書に段階（phases）が無い。今の流れから目指す形までの段階を書くと、ここで切り替えて見られる。")); return; }
+      panel.append(el("h2", null, "段階"));
+      const lb = listbox("段階", "phaseList");
+      phases.forEach((ph, i) => {
+        const op = option("ph", ph.id, i === p, () => { S.p = i; S.sel = null; S.selList = null; S.ck = null; sync(); });
+        op.append(el("b", null, ph.name + (i === CUR && phases.some((x) => x.current) ? "（今）" : "")), el("span", "n", "足りない " + gapsAt(i).list.length));
+        if (ph.note) op.append(el("small", null, ph.note));
+        lb.append(op);
+      });
+      rove(lb); panel.append(lb);
+      if (p === 0) { panel.append(el("p", "sub", "最初の段階（今）。次の段階を選ぶと、前の段階からの差が出る。")); }
+      else {
+        panel.append(el("h2", null, "「" + phases[p - 1].name + "」からの差"));
+        const dl = listbox("「" + phases[p - 1].name + "」からの差", "diffList");
+        const row = (k, t, ids, key) => {
+          const op = option("d", key, ids && S.selList && ids.join() === S.selList.join(), () => { if (!ids) return; S.selList = ids.slice(); S.sel = ids[0]; S.ck = null; sync(); });
+          op.append(el("b", null, k), el("span", null, t)); dl.append(op);
+        };
+        df.rep.forEach((r, i) => row("置き換え", r.from.map(short).join("・") + " → " + r.to.map(short).join("・"), r.to.concat(r.from), "rep" + i));
+        df.add.forEach((id) => row("足す", short(id), [id], "add-" + id));
+        df.rem.forEach((id) => row("無くす", short(id), [id], "rem-" + id));
+        df.chg.forEach((c) => row("変わる", short(c.id) + "：" + c.what.join("／"), [c.id], "chg-" + c.id));
+        df.edges.forEach(({ e, added }) => row(added ? "線を足す" : "線が無くなる", short(e.from) + " → " + short(e.to) + (e.label ? "（" + e.label + "）" : ""), [e.from, e.to], "edge-" + e.id));
+        if (!dl.children.length) row("—", "変わるものは無い", null, "none");
+        rove(dl); panel.append(dl);
+      }
+    }
+    if (keep) { const lb = document.getElementById(keep[0]); const o = lb && [...lb.querySelectorAll("[role=option]")].find((x) => x.dataset.key === keep[1]); if (o) { lb.querySelectorAll("[role=option]").forEach((x) => { x.tabIndex = x === o ? 0 : -1; }); o.focus(); } }
+  };
+  panel.addEventListener("keydown", (ev) => {
+    const lb = ev.target.closest && ev.target.closest("[role=listbox]"); if (!lb || ev.target.getAttribute("role") !== "option") return;
+    const os = [...lb.querySelectorAll("[role=option]")], i = os.indexOf(ev.target);
+    const go = (j) => { j = Math.max(0, Math.min(os.length - 1, j)); os.forEach((o, k) => { o.tabIndex = k === j ? 0 : -1; }); os[j].focus(); };
+    if (ev.key === "ArrowDown") go(i + 1); else if (ev.key === "ArrowUp") go(i - 1); else if (ev.key === "Home") go(0); else if (ev.key === "End") go(os.length - 1);
+    else if (ev.key === "Enter" || ev.key === " ") ev.target._pick(); else return;
+    ev.preventDefault();
+  });
+  // 1280 幅などで、一覧のぶん図が小さくなり、カードの名前が 14px を下回るときだけ、一覧をたためるようにする（見せ方 V1 の推す案）
+  const renderFold = () => {
+    const open = S.view !== "a" && !S.table, ws = (innerWidth - 270) / (W - 48);
+    const narrow = open && ws * 17 < 14 && ws < innerHeight / H; // たためば図が大きくなるときだけ
+    if (!narrow) document.body.removeAttribute("data-fold");
+    document.body.toggleAttribute("data-narrow", narrow);
+    const f = document.body.hasAttribute("data-fold");
+    fold.textContent = f ? "一覧を出す" : "一覧をたたむ"; fold.setAttribute("aria-expanded", String(!f));
+  };
+
+  // ---- 詳細の窓（popover） ----
+  const tip = document.getElementById("tip");
+  const renderTip = () => {
+    const id = S.sel, n = id && byId.get(id);
+    if (!n || !n.shown || S.table) { tip.hidden = true; return; }
+    const hadFocus = tip.contains(document.activeElement);
+    const view = S.view, p = effP(), G = gapsAt(p), first = G.list.length ? G.list[0] : null;
+    const liveE = edges.filter((e) => aliveAt(e, p) && aliveAt(byId.get(e.from), p) && aliveAt(byId.get(e.to), p));
+    tip.replaceChildren();
+    const h = el("h2", null, n.title); h.id = "tipTitle";
+    const x = el("button", "x", "×"); x.type = "button"; x.setAttribute("aria-label", "詳細を閉じる"); x.addEventListener("click", () => closeTip(true));
+    tip.append(h, x);
+    const row = (k, v) => { if (v == null || v === "") return; const d = el("div", "r"); d.append(el("span", null, k), typeof v === "string" ? document.createTextNode(v) : v); tip.append(d); };
+    const inv = INV(n, aliveAt(n, p) ? p : p - 1);
+    const invText = { human: "人がやる" + (n.layer === "upstream" && n.session !== "human" ? "（エージェントが下書き）" : ""), cond: "条件で人：" + condAt(n, p), agent: "エージェント（" + (n.session === "plan" ? "計画" : "実行") + "のセッション）", auto: "自動（コード・CI）" }[inv];
+    const tag = (e) => (e.label ? "（" + e.label + "）" : "") + mk("edge:" + e.id).map((m) => " " + markLine(m)).join("");
+    const nodeMarks = () => mk("node:" + id).forEach((m) => row("注記", markLine(m)));
+    if (view === "a") {
+      row("関わり", invText); row("スキル", n.skills.join("、") || "—"); row("成果物", n.output || "—");
+      row("受け取る", liveE.filter((e) => e.kind === "data" && e.to === id).map((e) => short(e.from) + tag(e)).join("、") || "—");
+      row("渡す", liveE.filter((e) => e.kind === "data" && e.from === id).map((e) => short(e.to) + tag(e)).join("、") || "—");
+      nodeMarks();
+    }
+    if (view === "b") {
+      row("関わり", invText);
+      if (n.kind === "gate") row("戻しにくさ", RISK[n.risk] || "書かれていない");
+      row("判定", n.check || "—"); row("スキル", n.skills.join("、") || "—");
+      const g = G.list.filter((o) => o.nodes.includes(id) && !(o.checks.length && o.tier === 4));
+      if (g.length) row("足りない", g.map((o) => (o === first ? "【次に直す】" : "") + o.text).join("／"));
+      const cks = n.checks.filter((c) => aliveAt(c, p));
+      if (cks.length) {
+        const ul = el("ul");
+        cks.forEach((c) => {
+          const li = el("li"); li.dataset.checkId = c.key; const gp = textAt(c.gaps, p), isF = first && first.checks.includes(c.key);
+          if (S.ck && S.ck.includes(c.key)) li.setAttribute("aria-current", "true");
+          li.append(el("i", gp ? (isF ? "gap1" : "gap") : c.session === "human" ? "hum" : ""), el("b", null, c.title),
+            el("em", null, c.session === "human" ? "人" : c.session === "run" ? "エージェント（実行）" : c.session === "plan" ? "エージェント（計画）" : "自動"), document.createTextNode(c.check || ""));
+          if (gp) li.append(el("strong", isF ? "first" : null, (isF ? "【次に直す】" : "") + "足りない：" + gp));
+          mk("check:" + c.key).forEach((m) => li.append(el("span", null, " " + markLine(m))));
+          ul.append(li);
+        });
+        row("中の検査", ul);
+      }
+      const back = liveE.filter((e) => e.kind !== "data" && (e.from === id || e.to === id)).map((e) => EDGE_KIND[e.kind] + "：" + short(e.from) + " → " + short(e.to) + tag(e));
+      row("戻り道", back.join("／") || "—");
+      nodeMarks();
+    }
+    if (view === "c") {
+      if (phases.length) { row("この段階で", changeOf(diffAt(p), id)); row("在る段階", phases.filter((ph, i) => aliveAt(n, i)).map((ph) => ph.name).join("、")); }
+      else row("関わり", invText);
+    }
+    tip.hidden = false;
+    nodes.forEach((m) => m.g.setAttribute("aria-expanded", String(m.id === id)));
+    placeTip();
+    if (hadFocus) x.focus();
+  };
+  // 置き場：選んだカード・つながるカード・戻り道・見出しと段の名前の帯を隠さない。
+  // 1) 図の下の空きが足りれば、そこに横長で出す（浮かせない）。2) 足りなければ、守る所に重ならず、ほかのカードにもなるべく重ならない所を探す。
+  const placeTip = () => {
+    if (tip.hidden || !S.sel) return;
+    const id = S.sel, view = S.view, p = effP(), wr = wrap.getBoundingClientRect(), [, vw] = VB();
+    const sc = Math.min(wr.width / vw, wr.height / H), bottom = wr.top + H * sc, free = wr.bottom - bottom;
+    tip.classList.remove("dock"); tip.style.width = ""; tip.style.height = "";
+    if (free >= 90) {
+      tip.classList.add("dock"); tip.style.left = wr.left + 12 + "px"; tip.style.width = wr.width - 24 + "px"; tip.style.top = bottom + 2 + "px";
+      if (tip.offsetHeight <= free - 8) return;
+      tip.classList.remove("dock"); tip.style.width = "";
+    }
+    const near = new Set([id, ...(S.selList || [])]);
+    edges.forEach((e) => { if (aliveAt(e, p) && (e.kind === "data" || view === "b") && (e.from === id || e.to === id)) { near.add(e.from); near.add(e.to); } });
+    const box = (g) => { const r = g.getBoundingClientRect(); return { l: r.left - 6, t: r.top - 6, r: r.right + 6, b: r.bottom + 6 }; };
+    const cards = nodes.filter((n) => n.shown).map((n) => ({ id: n.id, r: box(n.g) }));
+    const guard = cards.filter((c) => near.has(c.id)).map((c) => c.r);
+    if (view === "b") edges.filter((e) => e.g.classList.contains("route")).forEach((e) => guard.push(box(e.g)));
+    guard.push({ l: wr.left, t: wr.top, r: wr.right, b: wr.top + (TOP + 4) * sc });
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    const ov = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
+    const sel = (cards.find((c) => c.id === id) || { r: { r: wr.left, t: wr.top } }).r;
+    let best = null;
+    for (let y = wr.top + 8; y + th <= wr.bottom - 8; y += 12) for (let x = wr.left + 8; x + tw <= wr.right - 8; x += 12) {
+      const b = { l: x, t: y, r: x + tw, b: y + th };
+      if (guard.some((g) => ov(b, g) > 0)) continue;
+      const score = cards.reduce((s, c) => s + ov(b, c.r), 0) * 4 + Math.hypot(x - sel.r, y - sel.t);
+      if (!best || score < best.s) best = { s: score, x, y };
+    }
+    if (!best) best = { x: Math.max(8, Math.min(sel.r + 12, wr.right - tw - 8)), y: Math.max(8, Math.min(sel.t, wr.bottom - th - 8)) };
+    tip.style.left = best.x + "px"; tip.style.top = best.y + "px";
+  };
+  const closeTip = (refocus) => {
+    const id = S.sel; S.sel = null; S.selList = null; S.ck = null; S.gap = null; sync();
+    if (refocus && id && byId.get(id).shown) { figStop = id; nodes.forEach((n) => { n.g.tabIndex = n.id === id ? 0 : -1; }); byId.get(id).g.focus(); }
+  };
+  const select = (id) => { S.sel = id; S.selList = null; S.ck = null; S.gap = null; figStop = id; sync(); };
+
+  // ---- 図のカード：roving focus（Tab で止まるのは 1 か所。中は矢印キー） ----
+  let figStop = null;
+  const center = (n) => { const { x, y } = P.get(n.id); return { x: x + TW / 2, y: y + TH / 2 }; };
+  const bandOf = (n) => roleIx.get(n.role);
+  const readingOrder = (list) => list.slice().sort((a, b) => bandOf(a) - bandOf(b) || stageIx.get(a.stage) - stageIx.get(b.stage) || P.get(a.id).y - P.get(b.id).y);
+  const moveFrom = (n, key) => {
+    const c0 = center(n), vis = nodes.filter((m) => m.shown && m !== n);
+    let cand = [];
+    if (key === "ArrowRight" || key === "ArrowLeft") {
+      const dir = key === "ArrowRight" ? 1 : -1;
+      cand = vis.filter((m) => bandOf(m) === bandOf(n) && (center(m).x - c0.x) * dir > 1).map((m) => [m, Math.abs(center(m).x - c0.x) + Math.abs(center(m).y - c0.y) * 0.5]);
+    } else {
+      const dir = key === "ArrowDown" ? 1 : -1;
+      cand = vis.filter((m) => (center(m).y - c0.y) * dir > 1).map((m) => [m, Math.abs(center(m).y - c0.y) + Math.abs(center(m).x - c0.x) * 1.5]);
+    }
+    cand.sort((a, b) => a[1] - b[1]);
+    return cand.length ? cand[0][0] : null;
+  };
+  const focusCard = (n) => { figStop = n.id; nodes.forEach((m) => { m.g.tabIndex = m === n ? 0 : -1; }); n.g.focus(); };
+  const tabbables = () => [...document.querySelectorAll("button, [tabindex]")].filter((e) => e.tabIndex >= 0 && !e.closest("[hidden]") && e.getClientRects().length && !tip.contains(e) && getComputedStyle(e).visibility !== "hidden" && getComputedStyle(e).display !== "none");
+  svg.addEventListener("keydown", (ev) => {
+    const g = ev.target.closest && ev.target.closest(".card"); if (!g) return;
+    const n = byId.get(g.dataset.nodeId);
+    if (ev.key.startsWith("Arrow")) { const m = moveFrom(n, ev.key); if (m) focusCard(m); ev.preventDefault(); return; }
+    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id); n.g.focus(); return; }
+    if (ev.key === "Escape") { ev.preventDefault(); if (S.sel) closeTip(true); return; }
+    if (ev.key === "Home" || ev.key === "End") { const ro = readingOrder(nodes.filter((m) => m.shown)); if (ro.length) focusCard(ev.key === "Home" ? ro[0] : ro[ro.length - 1]); ev.preventDefault(); return; }
+    // 窓が開いていれば、Tab で窓の中へ入る（フォーカスは開いてもカードに残す）
+    if (ev.key === "Tab" && !ev.shiftKey && !tip.hidden && S.sel === n.id) { ev.preventDefault(); tip.querySelector("button").focus(); }
+  });
+  svg.addEventListener("click", (ev) => { const g = ev.target.closest(".card"); if (!g) return; ev.stopPropagation(); select(g.dataset.nodeId); });
+  svg.addEventListener("focusin", (ev) => { const g = ev.target.closest && ev.target.closest(".card"); if (g) { figStop = g.dataset.nodeId; nodes.forEach((m) => { m.g.tabIndex = m.id === figStop ? 0 : -1; }); } });
+  tip.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") { ev.preventDefault(); closeTip(true); return; }
+    if (ev.key !== "Tab") return;
+    const f = [...tip.querySelectorAll("button, [tabindex]")].filter((e) => e.tabIndex >= 0);
+    const card = S.sel && byId.get(S.sel).g;
+    if (ev.shiftKey && document.activeElement === f[0]) { ev.preventDefault(); if (card) card.focus(); }
+    else if (!ev.shiftKey && document.activeElement === f[f.length - 1]) {
+      // 窓を抜けたら、図の次（一覧）へ
+      const t = tabbables(), i = t.indexOf(card), next = t[i + 1];
+      if (next) { ev.preventDefault(); next.focus(); }
+    }
+  });
+  document.addEventListener("click", (ev) => {
+    // 押した要素が描き直しで外れていれば（一覧の行など）、外を押したことにしない
+    if (!ev.target.isConnected || ev.target.closest(".card, #panel, #tip, #top, #table")) return;
+    if (S.sel || S.selList) { S.sel = null; S.selList = null; S.ck = null; S.gap = null; sync(); }
+  });
+
+  // ---- 見方の切り替え：tablist（← → で隣へ移って切り替え、Home・End で端へ） ----
+  const tabs = [...document.querySelectorAll("#views [role=tab]")];
+  const setView = (v) => { figStop = null; S.view = v; S.sel = null; S.selList = null; S.ck = null; S.gap = null; S.table = false; if (v !== "c") S.p = NP - 1; sync(); };
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => setView(b.dataset.v));
+    b.addEventListener("keydown", (ev) => {
+      const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[ev.key];
+      if (j == null) return;
+      ev.preventDefault(); const t = tabs[(j + tabs.length) % tabs.length]; setView(t.dataset.v); t.focus();
+    });
+  });
+  document.getElementById("tableBtn").addEventListener("click", () => { S.table = !S.table; S.sel = null; S.selList = null; S.ck = null; S.gap = null; sync(); });
+
+  // ---- 表（全文を読む・探す・印刷する所。段階に関係なく全部を並べる） ----
+  const span = (o) => phases.length && (o.since || o.until) ? (o.since ? phases[phaseIx.get(o.since)].name : phases[0].name) + " から" + (o.until ? "（" + phases[phaseIx.get(o.until)].name + " で無くなる）" : "") : "すべての段階";
+  const invSpan = (n) => {
+    if (!phases.length) return INVL[INV(n, 0)];
+    const runs = [];
+    phases.forEach((ph, i) => { if (!aliveAt(n, i)) return; const v = INVL[INV(n, i)]; if (runs.length && runs[runs.length - 1].v === v) runs[runs.length - 1].to = ph.name; else runs.push({ v, from: ph.name, to: ph.name }); });
+    return runs.length === 1 ? runs[0].v : runs.map((r) => r.v + "（" + (r.from === r.to ? r.from : r.from + "〜" + r.to) + "）").join(" → ");
+  };
+  const renderTable = () => {
+    const sec = document.getElementById("table");
+    sec.append(el("h2", null, team + " の流れ：役割 × 段 × スキル × セッション × ツール"));
+    const t = el("table"), hr = el("tr");
+    ["段", "役割", "ノード", "関わり", "セッション", "種類", "スキル", "ツール", "成果物", "判定"].concat(phases.length ? ["段階"] : [], marks.length ? ["注記"] : []).forEach((x) => hr.append(el("th", null, x)));
+    t.append(hr);
+    nodes.slice().sort((a, b) => stageIx.get(a.stage) - stageIx.get(b.stage) || roleIx.get(a.role) - roleIx.get(b.role)).forEach((n) => {
+      const tr = el("tr"); tr.dataset.nodeId = n.id;
+      const td = (...c) => { const d = el("td"); c.forEach((x) => d.append(typeof x === "string" ? document.createTextNode(x) : x)); tr.append(d); return d; };
+      td(stName(n.stage)); td(roName(n.role));
+      const nc = td(n.title);
+      if (n.checks.length) {
+        const ol = el("ol");
+        n.checks.forEach((c) => {
+          const li = el("li", null, c.title + "（" + (SESSION[c.session] || "自動") + "）" + (c.check ? "：" + c.check : "") + (c.gaps.length ? "／足りない：" + c.gaps.map((g) => g.text).join("／") : "") + (phases.length && (c.since || c.until) ? "／" + span(c) : "") + mk("check:" + c.key).map((m) => " " + markLine(m)).join(""));
+          li.dataset.checkId = c.key; ol.append(li);
+        });
+        nc.append(ol);
+      }
+      const conds = n.conds.map((c) => "条件：" + c.text + (phases.length && (c.since || c.until) ? "（" + span(c) + "）" : "")).join("／");
+      td(invSpan(n) + (conds ? "。" + conds : ""));
+      td(SESSION[n.session] || (n.auto ? "自動" : "不明"));
+      td((KIND[n.kind] || "—") + (n.kind === "gate" ? "・" + (RISK[n.risk] || "戻しにくさ不明") : ""));
+      const sk = td(); if (n.skills.length) n.skills.forEach((s, i) => { if (i) sk.append("、"); sk.append(el("code", null, s)); }); else sk.append(n.wantsSkill ? "無し（足りない）" : "—");
+      td(n.tools.map((x) => toolName.get(x) || x).join("、") || "—"); td(n.output || "—"); td(n.check || "—");
+      if (phases.length) td(span(n) + (n.gaps.length ? "。足りない：" + n.gaps.map((g) => g.text + (g.since || g.until ? "（" + span(g) + "）" : "")).join("／") : ""));
+      else if (n.gaps.length) nc.append(el("div", null, "足りない：" + n.gaps.map((g) => g.text).join("／")));
+      if (marks.length) td(mk("node:" + n.id).map(markLine).join("／"));
+      t.append(tr);
+    });
+    sec.append(t);
+    const ed = edges.filter((e) => e.kind !== "data");
+    if (ed.length) {
+      sec.append(el("h3", null, "戻り道（直し・学び）"));
+      const t2 = el("table"), h2 = el("tr"); ["種類", "から", "へ", "渡すもの"].concat(phases.length ? ["段階"] : []).forEach((x) => h2.append(el("th", null, x))); t2.append(h2);
+      ed.forEach((e) => { const tr = el("tr"); tr.dataset.edgeId = e.id; [EDGE_KIND[e.kind], byId.get(e.from).title, byId.get(e.to).title, e.label + mk("edge:" + e.id).map((m) => " " + markLine(m)).join("")].concat(phases.length ? [span(e)] : []).forEach((x) => tr.append(el("td", null, x))); t2.append(tr); });
+      sec.append(t2);
+    }
+    const lost = marks.filter((m) => !m.found);
+    if (O) {
+      sec.append(el("h3", null, "注記" + source + (O.title ? "：" + str(O.title) : "")));
+      if (lost.length) { const ul = el("ul"); lost.forEach((m) => ul.append(el("li", null, m.target + "（図に無い対象）：" + m.label + (m.text ? "：" + m.text : "")))); sec.append(el("p", null, "図に無い対象の注記："), ul); }
+      else sec.append(el("p", null, marks.length ? "注記はどれも図の上に出ている（見方 a・b）。" : "注記はありません。"));
+    }
+  };
+  renderTable();
+
+  // ---- 状態を URL の hash に持つ（#b&sel=n9 の形。開き直すと同じ見方・段階・選んだカードに戻る） ----
+  const parse = () => {
+    const parts = location.hash.slice(1).split("&").filter(Boolean), q = new Map();
+    parts.forEach((x) => { const [k, ...v] = x.split("="); q.set(decodeURIComponent(k), decodeURIComponent(v.join("="))); });
+    S.view = ["a", "b", "c"].find((v) => q.has(v)) || "a";
+    S.table = q.has("table");
+    S.p = phaseIx.has(q.get("p")) ? phaseIx.get(q.get("p")) : NP - 1;
+    S.sel = byId.has(q.get("sel")) ? q.get("sel") : null;
+    S.gap = q.get("g") || null;
+    const g = S.view === "b" && S.gap ? gapsAt(CUR).list.find((o) => o.key === S.gap) : null;
+    if (g) { S.selList = g.nodes.slice(); S.ck = g.checks.length ? g.checks.slice() : null; if (!S.sel) S.sel = g.nodes[0] || null; } else { S.gap = null; S.selList = null; S.ck = q.get("ck") && checkByKey.has(q.get("ck")) ? [q.get("ck")] : null; }
+    if (S.sel) figStop = S.sel;
+  };
+  const sync = () => {
+    const q = [S.view];
+    if (S.view === "c" && S.p !== NP - 1 && phases.length) q.push("p=" + encodeURIComponent(phases[S.p].id));
+    if (S.sel) q.push("sel=" + encodeURIComponent(S.sel));
+    if (S.gap) q.push("g=" + S.gap);
+    if (S.table) q.push("table");
+    const nh = "#" + q.join("&");
+    if (location.hash !== nh) history.replaceState(null, "", nh);
+    render();
+  };
+  addEventListener("hashchange", () => { parse(); render(); });
+  addEventListener("resize", () => { renderFold(); placeTip(); });
+  parse();
+  render();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => placeTip());
 })();
 </script>
 </body>

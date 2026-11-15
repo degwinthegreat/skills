@@ -1,0 +1,125 @@
+{
+ "version": 1,
+ "team": "ひよこ豆",
+ "repo": "hiyoko/app",
+ "roles": [
+  {
+   "id": "lead",
+   "name": "リード",
+   "people": 1,
+   "decides": true
+  },
+  {
+   "id": "dev",
+   "name": "開発",
+   "people": 2
+  }
+ ],
+ "stages": [
+  {
+   "id": "intent",
+   "name": "原則"
+  },
+  {
+   "id": "plan",
+   "name": "計画"
+  },
+  {
+   "id": "run",
+   "name": "実行"
+  },
+  {
+   "id": "review",
+   "name": "レビュー"
+  },
+  {
+   "id": "eval",
+   "name": "評価"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "a",
+   "stage": "intent",
+   "role": "lead",
+   "title": "原則を書く",
+   "skills": [
+    "intent-skill"
+   ],
+   "session": "plan",
+   "layer": "upstream",
+   "kind": "work",
+   "check": "欄が埋まっている"
+  },
+  {
+   "id": "b",
+   "stage": "plan",
+   "role": "dev",
+   "title": "計画を書く（依頼）",
+   "skills": [],
+   "session": "plan",
+   "kind": "split",
+   "gap": "分けるスキルが無い"
+  },
+  {
+   "id": "c",
+   "stage": "run",
+   "role": "dev",
+   "title": "実装する",
+   "skills": [
+    "impl"
+   ],
+   "session": "run",
+   "kind": "work",
+   "check": "テストが 0 で終わる"
+  },
+  {
+   "id": "d",
+   "stage": "review",
+   "role": "lead",
+   "title": "レビューしてマージ",
+   "session": "human",
+   "kind": "gate",
+   "risk": "wide",
+   "human": true,
+   "check": "承認"
+  },
+  {
+   "id": "e",
+   "stage": "eval",
+   "role": "lead",
+   "title": "振り返る",
+   "session": "human",
+   "kind": "work"
+  }
+ ],
+ "edges": [
+  {
+   "from": "a",
+   "to": "b",
+   "label": "原則"
+  },
+  {
+   "from": "b",
+   "to": "c",
+   "label": "依頼"
+  },
+  {
+   "from": "c",
+   "to": "d",
+   "label": "PR"
+  },
+  {
+   "from": "d",
+   "to": "e",
+   "label": "マージ"
+  },
+  {
+   "from": "d",
+   "to": "c",
+   "kind": "fix",
+   "label": "指摘"
+  }
+ ],
+ "ticket_template": "## ゴール\n"
+}

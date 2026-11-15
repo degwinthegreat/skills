@@ -1,0 +1,37 @@
+{
+ "version": 1,
+ "source": "週ごとの集計（架空）",
+ "title": "実際の流れとのずれ",
+ "marks": [
+  {
+   "target": "node:n9",
+   "level": "info",
+   "label": "差し戻し 12%",
+   "text": "直近 4 週のマージの差し戻し率（架空の値）"
+  },
+  {
+   "target": "node:n8h",
+   "level": "warn",
+   "label": "待ち 2 日",
+   "text": "人のレビューの待ちが平均 2 日（架空の値）"
+  },
+  {
+   "target": "edge:n9>n6:fix",
+   "level": "info",
+   "label": "直し 3 回",
+   "text": "マージからの差し戻しが直近 4 週で 3 回（架空の値）"
+  },
+  {
+   "target": "check:n9/risk",
+   "level": "warn",
+   "label": "見落とし 1",
+   "text": "戻せない変更の確認で 1 件見落とした（架空の値）"
+  },
+  {
+   "target": "node:n99",
+   "level": "info",
+   "label": "図に無い",
+   "text": "仕様書に無いノードを指す注記（架空）"
+  }
+ ]
+}
