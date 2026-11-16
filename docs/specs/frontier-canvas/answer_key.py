@@ -247,9 +247,9 @@ def main(path):
     for i, s in enumerate(stages):
         w(f"| {i + 1} | {s['name']} | {GROUP_JA.get(s.get('group'), '－')} |")
     w(f"\n- {len(stages)} 段。始まり：{stages[0]['name']}、終わり：{stages[-1]['name']}。")
-    last = len(phases) - 1
-    mp = main_path(last)
-    w(f"- 主な道（{phases[last]['name']}、データの線の最長）：" + " → ".join(byid[i]["_short"] for i in mp))
+    # a は今の段階で判定する（2026-11-16 に「最後の段階」から改めた）
+    mp = main_path(cur)
+    w(f"- 主な道（{phases[cur]['name']}、データの線の最長）：" + " → ".join(byid[i]["_short"] for i in mp))
 
     w("\n## 人の関わりときっかけ（a2）\n")
     w("| ノード | 段 | 役割 | " + " | ".join(p["name"] for p in phases) + " |")
@@ -267,7 +267,7 @@ def main(path):
     for t in D.get("triggers", []):
         who = roles.get(t.get("role"), {}).get("name", "") if t.get("by") == "human" else ""
         w(f"- きっかけ：{BY_JA.get(t['by'], t['by'])}{'（' + who + '）' if who else ''}「{t['label']}」→ {byid[t['to']]['_short']}")
-    w(f"- 見出しの規則（{phases[last]['name']}）：{headline_a(last)}")
+    w(f"- 見出しの規則（{phases[cur]['name']}）：{headline_a(cur)}")
 
     w("\n## 関門と戻り道（a3）\n")
     w("| 段階 | 人を置く関門（`human`） | 関門（戻しにくさ） | 直しの辺 | 学びの辺 |\n| --- | --- | --- | --- | --- |")

@@ -609,14 +609,17 @@
   const CUR = Math.max(0, phases.findIndex((ph) => ph.current));
   const S = { view: "a", p: NP - 1, sel: null, selList: null, ck: null, gap: null, table: false };
   let nameFS = NAME;
-  const effP = () => (S.view === "a" ? NP - 1 : S.view === "b" ? CUR : S.p);
+  // a と b は今の段階（current、無ければ最初の段階）を描く。最後の段階（目指す形）は c で選んで見る（2026-11-16 に改めた）。
+  const effP = () => (S.view === "c" ? S.p : CUR);
   const VB = () => (S.view === "a" ? [0, W] : [32, W - 48]);
 
   // ---- 見出しの文（見方ごとの規則。手で書いた文にしない） ----
   const headline = (view, p, G, df) => {
     const ns = nodes.filter((n) => aliveAt(n, p));
     if (view === "a") {
-      const HN = ns.filter((n) => INV(n, p) === "human"), Cn = ns.filter((n) => INV(n, p) === "cond");
+      // 段の名前は段の順に並べる（ノードを書いた順ではなく）
+      const bySt = (l) => l.slice().sort((x, y) => stageIx.get(x.stage) - stageIx.get(y.stage));
+      const HN = bySt(ns.filter((n) => INV(n, p) === "human")), Cn = bySt(ns.filter((n) => INV(n, p) === "cond"));
       // 入力のまとまり：group が input の段。group の無い仕様書では、ノードがすべて上流の段。
       const hasG = stages.some((s) => s.group);
       const inSt = stages.filter((s) => { const ins = ns.filter((n) => n.stage === s.id); return hasG ? s.group === "input" : ins.length && ins.every((n) => n.layer === "upstream"); }).map((s) => s.id);
@@ -627,7 +630,7 @@
         ...uniq(HN.filter((n) => !(inAll && inSt.includes(n.stage))).map((n) => stName(n.stage))),
       ];
       const cst = uniq(Cn.map((n) => stName(n.stage)));
-      // どの段階の図かを見出しの頭で言う（a は最後の段階＝目指す形で判定する）
+      // どの段階の図かを見出しの頭で言う（a は今の段階で判定する）
       const h = (phases.length ? phName(p) + "：" : "") + stages[0].name + "から" + stages[stages.length - 1].name + "まで " + stages.length + " 段。" +
         (items.length ? "人がやるのは" + uniq(items).join("と") + (cst.length ? "、" + cst.join("・") + "は条件で人" : "") + "。" : cst.length ? "人は" + cst.join("・") + "で条件つきで関わる。" : "人は関わらない。");
       const cnt = (k) => ns.filter((n) => INV(n, p) === k).length;
@@ -701,14 +704,30 @@
         }
         i = j + 1;
       }
-      triggers.forEach((t) => {
-        const n = byId.get(t.to); if (!alive(n)) return;
-        const pp = P.get(t.to), x = pp.x + 24, hu = t.by === "human", g = sv("g", { class: "dyn" }, lay.top);
-        sv("path", { d: `M${x},${pp.y - 24}V${pp.y - 2}`, stroke: "#8a8378", "stroke-width": 1.2, fill: "none" }, g);
+      // きっかけ：入るノードごとに 1 本の矢印。by と label が同じなら役割を「・」でつないで 1 行にまとめ、違えば行を上へ積む（重ねない）。
+      // 文字は列の幅で切って … を付け（隣の列のきっかけの矢印と文字に重ならない）、全文はツールチップ（<title>）に出す。
+      groupBy(triggers.filter((t) => alive(byId.get(t.to))), (t) => t.to).forEach((l, to) => {
+        const rows = [];
+        l.forEach((t) => {
+          const r = rows.find((q) => q.by === t.by && q.label === t.label);
+          const who = t.by === "human" ? (roleIx.has(t.role) ? roName(t.role) : "人") : "";
+          if (r) { if (!r.who.includes(who)) r.who.push(who); } else rows.push({ by: t.by, label: t.label, who: [who] });
+        });
+        const pp = P.get(to), x = pp.x + 24, hu = rows.some((r) => r.by === "human"), g = sv("g", { class: "dyn", "data-trigger-to": to }, lay.top);
+        // 1 行なら今までの位置。2 行以上は、カードの上の余白（段の名前の下の罫まで）に収まるよう下から 13 ずつ積む。
+        const base = rows.length > 1 ? pp.y - 4 : pp.y - 12, y0 = rows.length > 1 ? base - (rows.length - 1) * 13 - 9 : pp.y - 24;
+        sv("path", { d: `M${x},${y0}V${pp.y - 2}`, stroke: "#8a8378", "stroke-width": 1.2, fill: "none" }, g);
         sv("path", { d: head(x, pp.y - 2, "d"), stroke: hu ? HUM : "#8a8378", "stroke-width": 1.6, fill: "none" }, g);
-        sv("circle", { cx: x, cy: pp.y - 25, r: 2.2, fill: "#8a8378" }, g);
-        const who = hu ? (roleIx.has(t.role) ? roName(t.role) : "人") + "が渡す：" : t.by === "schedule" ? "定期：" : "イベント：";
-        tx(g, x + 9, pp.y - 12, who + t.label, { "font-size": 11.5, "font-weight": hu ? 600 : 400, fill: hu ? "#4a4642" : SUB, "font-family": GOTH });
+        sv("circle", { cx: x, cy: y0 - 1, r: 2.2, fill: "#8a8378" }, g);
+        // 右の端：隣の列のきっかけの矢印（次の列のカードの x + 24）の手前。図の右の端を越えない。
+        const room = Math.min(pp.x + CW + 18, R) - (x + 9);
+        rows.forEach((r, k) => {
+          const rh = r.by === "human", full = (rh ? r.who.join("・") + "が渡す：" : r.by === "schedule" ? "定期：" : "イベント：") + r.label;
+          const t = tx(g, x + 9, base - (rows.length - 1 - k) * 13, full, { "font-size": 11.5, "font-weight": rh ? 600 : 400, fill: rh ? "#4a4642" : SUB, "font-family": GOTH });
+          let s = full;
+          while (s.length > 1 && t.getComputedTextLength() > room) { s = s.slice(0, -1); t.textContent = s.replace(/[：。、・\s]+$/, "") + "…"; }
+          sv("title", {}, t).textContent = full;
+        });
       });
     }
     const liveE = (e) => aliveAt(e, p) && alive(byId.get(e.from)) && alive(byId.get(e.to));
