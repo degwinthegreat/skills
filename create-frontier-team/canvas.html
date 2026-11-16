@@ -478,13 +478,14 @@
   const mainPathAt = (p) => {
     const alive = (n) => aliveAt(n, p);
     const outE = groupBy(edges.filter((e) => e.kind === "data" && (fwd(e) || sameStage(e)) && aliveAt(e, p) && alive(byId.get(e.from)) && alive(byId.get(e.to))), (e) => e.from);
-    const lastSt = stages[stages.length - 1].id, memo = new Map(), onPath = new Set();
+    // 終わりは、この段階でノードがある最後の段（今の段階に評価のノードが無ければ、マージまで。2026-11-16 に改めた）
+    const lastIx = Math.max(-1, ...nodes.filter(alive).map((n) => stageIx.get(n.stage))), memo = new Map(), onPath = new Set();
     const lg = (id) => {
       if (memo.has(id)) return memo.get(id);
       onPath.add(id);
       let best = null;
       for (const e of outE.get(id) || []) { if (onPath.has(e.to)) continue; const r = lg(e.to); if (r && (!best || r.length + 1 > best.length)) best = [e, ...r]; }
-      if (!best && byId.get(id).stage === lastSt) best = [];
+      if (!best && stageIx.get(byId.get(id).stage) === lastIx) best = [];
       onPath.delete(id);
       memo.set(id, best); return best;
     };
@@ -710,7 +711,7 @@
         const rows = [];
         l.forEach((t) => {
           const r = rows.find((q) => q.by === t.by && q.label === t.label);
-          const who = t.by === "human" ? (roleIx.has(t.role) ? roName(t.role) : "人") : "";
+          const who = t.by === "human" ? (roleIx.has(t.role) ? t.role : "") : null;
           if (r) { if (!r.who.includes(who)) r.who.push(who); } else rows.push({ by: t.by, label: t.label, who: [who] });
         });
         const pp = P.get(to), x = pp.x + 24, hu = rows.some((r) => r.by === "human"), g = sv("g", { class: "dyn", "data-trigger-to": to }, lay.top);
@@ -719,12 +720,16 @@
         sv("path", { d: `M${x},${y0}V${pp.y - 2}`, stroke: "#8a8378", "stroke-width": 1.2, fill: "none" }, g);
         sv("path", { d: head(x, pp.y - 2, "d"), stroke: hu ? HUM : "#8a8378", "stroke-width": 1.6, fill: "none" }, g);
         sv("circle", { cx: x, cy: y0 - 1, r: 2.2, fill: "#8a8378" }, g);
-        // 右の端：隣の列のきっかけの矢印（次の列のカードの x + 24）の手前。図の右の端を越えない。
-        const room = Math.min(pp.x + CW + 18, R) - (x + 9);
+        // 右の端：同じ高さで右にある、次のきっかけの矢印の手前（無ければ図の右の端）。収まらないときだけ切る。
+        const nextX = Math.min(R, ...uniq(triggers.map((u) => u.to)).filter((id) => id !== to && alive(byId.get(id)) && Math.abs(P.get(id).y - pp.y) < TH && P.get(id).x > pp.x).map((id) => P.get(id).x + 24 - 6));
+        const room = nextX - (x + 9);
         rows.forEach((r, k) => {
-          const rh = r.by === "human", full = (rh ? r.who.join("・") + "が渡す：" : r.by === "schedule" ? "定期：" : "イベント：") + r.label;
-          const t = tx(g, x + 9, base - (rows.length - 1 - k) * 13, full, { "font-size": 11.5, "font-weight": rh ? 600 : 400, fill: rh ? "#4a4642" : SUB, "font-family": GOTH });
-          let s = full;
+          const rh = r.by === "human", names = r.who.map((id) => (id ? roName(id) : "人")).join("・") + "が渡す：";
+          // 渡す役割が、入るカードの行の役割と同じなら「…が渡す：」を外す（人のきっかけは太字と矢印の色で分かる）。全文には残す。
+          const same = rh && r.who.length === 1 && r.who[0] === byId.get(to).role;
+          const full = (rh ? names : r.by === "schedule" ? "定期：" : "イベント：") + r.label, shown = same ? r.label : full;
+          const t = tx(g, x + 9, base - (rows.length - 1 - k) * 13, shown, { "font-size": 11.5, "font-weight": rh ? 600 : 400, fill: rh ? "#4a4642" : SUB, "font-family": GOTH });
+          let s = shown;
           while (s.length > 1 && t.getComputedTextLength() > room) { s = s.slice(0, -1); t.textContent = s.replace(/[：。、・\s]+$/, "") + "…"; }
           sv("title", {}, t).textContent = full;
         });

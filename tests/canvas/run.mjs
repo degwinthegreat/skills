@@ -437,15 +437,22 @@ try {
       bg.forEach((x) => { if (hit(t, x)) clash.push(g.to + ":" + t.s + " × " + x.s); });
     }));
     eq("きっかけの文字が、隣の列のきっかけ・同じノードのきっかけ・段の名前と罫に重ならない" + sz, clash, []);
-    // 切った文字には … を付け、全文はツールチップに出す。役割の名前は外さない
+    // 全文（役割名つき）はツールチップに出す
     eq("きっかけの全文はツールチップに" + sz, T.flatMap((g) => g.texts.map((t) => t.full)), ["プロダクトマネージャーが渡す：市場の変化と競合の動き", "定期：四半期ごとの見直し", "プロダクトマネージャーが渡す：顧客からの要望の見直し", "プロダクトマネージャー・アプリケーション開発が渡す：改善の依頼"]);
-    check("切ったきっかけの文字は … で終わり、全文の頭と同じ" + sz, T.every((g) => g.texts.every((t) => t.s === t.full || (t.s.endsWith("…") && t.full.startsWith(t.s.slice(0, -1))))), JSON.stringify(T.map((g) => g.texts.map((t) => t.s))));
-    check("きっかけの文字は役割の名前から始まる" + sz, ["p1", "p2", "p3"].every((id) => byTo.get(id).texts[0].s.startsWith("プロダクトマネージャー")));
+    // 見える文字は、全文か、全文の「…が渡す：」を外したもの。切ったときだけ … で終わり、その頭と同じ
+    check("きっかけの見える文字は全文の後ろの一部で、切ったときだけ … で終わる" + sz, T.every((g) => g.texts.every((t) => { const v = t.s.replace(/…$/, ""); const tail = t.full.endsWith(t.s) ? t.s : null; return tail !== null || (t.s.endsWith("…") && t.full.includes(v)); })), JSON.stringify(T.map((g) => g.texts.map((t) => t.s))));
+    // 役割が入るカードの行と同じなら「…が渡す：」を外し、違えば（まとめた A・B を含む）残す
+    eq("役割が行と同じなら「…が渡す：」を外し、違えば残す" + sz, T.flatMap((g) => g.texts.map((t) => g.to + ":" + t.s.includes("が渡す："))), ["p1:false", "p1:false", "p2:false", "p3:true"]);
+    // ラベルの本文（全文の「：」の後ろ）が 4 文字以上見える
+    eq("きっかけのラベルの本文が 4 文字以上見える" + sz, T.flatMap((g) => g.texts.filter((t) => { const body = t.full.slice(t.full.indexOf("：") + 1), v = t.s.replace(/…$/, ""), seen = v.includes("：") ? v.slice(v.indexOf("：") + 1) : v; return !body.startsWith(seen) || [...seen].length < 4; }).map((t) => g.to + ":" + t.s)), []);
     // (b) 同じノードの 2 本：by と label が同じなら 1 行にまとめ、違えば積む。矢印は 1 本（線と矢じりの 2 つの path）
     eq("同じノードへの 2 本：違うものは 2 行に積む" + sz, byTo.get("p1").texts.length, 2);
     eq("同じノードへの 2 本：同じものは 1 行にまとめる" + sz, byTo.get("p3").texts.length, 1);
     eq("同じノードへのきっかけの矢印は 1 本" + sz, T.map((g) => g.arrows), [2, 2, 2]);
     check("積んだ 2 行はどちらも画面の中で読める" + sz, byTo.get("p1").texts.every((t) => t.r - t.l > 20 && t.t >= 0 && t.b <= h));
+    // そらまめのきっかけは切れない（役割が行と同じなのでラベルだけ）
+    await open(PAGES.sora + "#a"); await js(HELP);
+    eq("そらまめのきっかけは切れない" + sz, (await js(trigBoxes)).flatMap((g) => g.texts.map((t) => t.s)), ["機能の依頼"]);
   }
   await viewport(1440, 900);
   // (c) a は今の段階を描き、目指す形で足すノードを出さない。c で目指す形を選ぶと出る
@@ -460,8 +467,23 @@ try {
   await open(PAGES.soraCur + "#a"); await js(HELP);
   check("current が段階1 なら、a は段階1 を描く", (await headline()).startsWith(soraCur.phases[1].name + "："), await headline());
 
+  // ==== 主な道：描く段階でノードがある最後の段まで。答え合わせの表（answer_key.py）の道と同じ ====
+  const keyPath = (spec) => {
+    const f = join(work, "key-" + Math.random().toString(36).slice(2) + ".json"); writeFileSync(f, spec);
+    const out = execFileSync("python3", ["-I", join(ROOT, "docs/specs/frontier-canvas/answer_key.py"), f]).toString();
+    return out.match(/^- 主な道（[^）]*）：(.*)$/m)[1].split(" → ").filter(Boolean);
+  };
+  const shortOf = (n) => n.short || (n.title.replace(/[（(][^（）()]*[）)]/g, "").replace(/\s+/g, " ").trim() || n.title);
+  for (const [name, page, spec] of [["そらまめ（今）", PAGES.sora, soramameText], ["そらまめ（目指す形を今）", PAGES.soraTobe, JSON.stringify(soraTobe)], ["再現用（今）", PAGES.trig, readFileSync(join(HERE, "triggers.json"), "utf8")]]) {
+    await open(page + "#a"); await js(HELP);
+    const ids = await js(`[...document.querySelectorAll("[data-layer=main] g[data-edge-id]")].filter(__vis).flatMap((g) => g.dataset.edgeId.split(":")[0].split(">"))`);
+    const nm = new Map(JSON.parse(spec).nodes.map((n) => [n.id, shortOf(n)]));
+    eq("主な道が答え合わせの表と同じ：" + name, [...new Set(ids.map((i) => nm.get(i)))].sort(), keyPath(spec).sort());
+  }
+
   // ==== version 1・欠けた仕様書・埋め込みなし ====
   await open(PAGES.v1); await js(HELP);
+  eq("version 1：主な道（phases が無い図は変わらない）", await js(`[...document.querySelectorAll("[data-layer=main] g[data-edge-id]")].filter(__vis).map((g) => g.dataset.edgeId).sort()`), ["a>b:data", "b>c:data", "c>d:data", "d>e:data"]);
   eq("version 1：見出し", await headline(), "原則から評価まで 5 段。人がやるのは入力の 1 段とレビューと評価。");
   await go("b");
   check("version 1：b の一覧", (await js(`document.getElementById("panel").textContent`)).includes("分けるスキルが無い"));
