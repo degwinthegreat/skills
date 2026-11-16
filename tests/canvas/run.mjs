@@ -29,8 +29,11 @@ const embed = (spec, overlay, name) => {
 const soramameText = readFileSync(SORAMAME, "utf8");
 const overlayText = readFileSync(join(HERE, "soramame-overlay.json"), "utf8");
 const soraCur = JSON.parse(soramameText); soraCur.phases[1].current = true; // 段階1 を「今」にした版
+const soraTobe = JSON.parse(soramameText); soraTobe.phases[3].current = true; // 目指す形を「今」にした版（a の描き方を、全部のカードで見る）
 const PAGES = {
   sora: embed(soramameText, overlayText, "soramame.html"),
+  soraTobe: embed(JSON.stringify(soraTobe), overlayText, "soramame-tobe.html"),
+  trig: embed(readFileSync(join(HERE, "triggers.json"), "utf8"), null, "triggers.html"),
   soraPlain: embed(soramameText, null, "soramame-plain.html"),
   soraCur: embed(JSON.stringify(soraCur), null, "soramame-current.html"),
   v1: embed(readFileSync(join(HERE, "v1.json"), "utf8"), null, "v1.html"),
@@ -136,6 +139,11 @@ try {
   check("チケットの雛形が無い", !(await js(`document.body.innerText.includes("雛形") || document.body.innerHTML.includes("## ゴール")`)));
   eq("画面の枠の要素（見方 3・表 1）", await js(`[...document.querySelectorAll("#top button")].filter(__vis).map((b) => b.textContent)`), ["全体を掴む", "次に直す", "移行", "表"]);
   check("凡例が無い", !(await js(`/凡例|legend/i.test(document.body.innerHTML.replace(/<script[\\s\\S]*?<\\/script>/g, ""))`)));
+  // a は今の段階を描く（current が無ければ最初の段階。2026-11-16 に改めた）。目指す形で足すカードは出さない
+  eq("見出し a（今の段階を描き、頭にその名前）", await headline(), "今：要求・原則から評価まで 8 段。人がやるのは機能の依頼と入力の 3 段と検証とマージ。");
+  eq("a のカードは今の段階のもの", await js(`__cards().map((g) => g.dataset.nodeId)`), ["n1", "n2", "n3", "n4", "n6", "n9", "n8h"]);
+  // ここから下の a の描き方は、目指す形を今にした版で、全部のカードについて見る
+  await open(PAGES.soraTobe); await js(HELP);
   eq("見出し a（頭にどの段階の図か）", await headline(), "目指す形：要求・原則から評価まで 8 段。人がやるのは機能の依頼と入力の 3 段、マージは条件で人。");
   check("a の下の 1 行に段階の名前を重ねない", !(await js(`document.querySelector("[data-layer=bg] text:nth-of-type(2)").textContent`)).includes("目指す形"));
   eq("a のカードの札", await js(`__cards().map((g) => g.dataset.nodeId + ":" + [...g.querySelectorAll("text")].map((t) => t.textContent).filter((t) => ["人", "条件で人", "エージェント", "自動"].includes(t)).join())`),
@@ -164,6 +172,7 @@ try {
     ["n1>n2:data", "n2>n4:data", "n4>n5:data", "n5>n6:data", "n6>n7:data", "n7>n8:data", "n8>n9:data", "n9>dc:data", "dc>n10:data", "n10>n11:data"].sort());
   check("a の主な道は濃い線", await js(`[...document.querySelectorAll("[data-layer=main] g[data-edge-id] path")].filter(__vis).every((x) => x.getAttribute("stroke") === "#6e665b")`));
   check("赤を a で使わない", !(await js(`document.getElementById("v").innerHTML.toLowerCase().includes("#c23a22")`)));
+  await open(PAGES.sora); await js(HELP);
 
   // 属性
   const attrs = await js(`["data-node-id","data-edge-id","data-check-id","data-role-id","data-stage-id"].map((a) => document.querySelectorAll("[" + a + "]").length)`);
@@ -407,8 +416,74 @@ try {
   await viewport(1440, 900); await open(PAGES.sora + "#b"); await js(HELP);
   check("1440 ではたたむボタンを出さない", !(await js(`__vis(document.getElementById("fold"))`)));
 
+  // ==== きっかけと今の段階（持ち主のフィードバック、2026-11-16）：tests/canvas/triggers.json ====
+  // 長い役割名・隣の列の人のきっかけ・同じノードへの 2 本（まとめるものと積むもの）・段階 2 つ（今が current）・目指す形で足すノード
+  const trigBoxes = `(() => {
+    const r = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+    return [...document.querySelectorAll("[data-trigger-to]")].map((g) => ({ to: g.dataset.triggerTo,
+      texts: [...g.querySelectorAll("text")].map((t) => Object.assign(r(t), { s: t.childNodes[0].textContent, full: t.querySelector("title").textContent })),
+      paths: [...g.querySelectorAll("path, circle")].map(r), arrows: g.querySelectorAll("path").length }));
+  })()`;
+  const hit = (a, b) => Math.min(a.r, b.r) > Math.max(a.l, b.l) + 0.5 && Math.min(a.b, b.b) > Math.max(a.t, b.t) + 0.5;
+  for (const [w, h] of [[1440, 900], [1280, 800]]) {
+    await viewport(w, h); await open(PAGES.trig + "#a"); await js(HELP);
+    const sz = `（${w}×${h}）`, T = await js(trigBoxes), byTo = new Map(T.map((g) => [g.to, g]));
+    // (a) 隣の列のきっかけの文字は、ほかのきっかけの文字・矢印に重ならない。段の名前と罫にも重ならない
+    const bg = await js(`[...document.querySelectorAll("[data-layer=bg] text, [data-layer=bg] line")].filter((e) => __vis(e) && e.getBoundingClientRect().top < document.querySelector("[data-trigger-to]").getBoundingClientRect().bottom).map((e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, s: e.textContent || "罫" }; })`);
+    const clash = [];
+    T.forEach((g) => g.texts.forEach((t) => {
+      T.filter((o) => o !== g).forEach((o) => [...o.texts, ...o.paths].forEach((x) => { if (hit(t, x)) clash.push(g.to + ":" + t.s + " × " + o.to + ":" + (x.s || "矢印")); }));
+      g.texts.filter((u) => u !== t).forEach((u) => { if (hit(t, u)) clash.push(g.to + ":" + t.s + " × " + u.s); });
+      bg.forEach((x) => { if (hit(t, x)) clash.push(g.to + ":" + t.s + " × " + x.s); });
+    }));
+    eq("きっかけの文字が、隣の列のきっかけ・同じノードのきっかけ・段の名前と罫に重ならない" + sz, clash, []);
+    // 全文（役割名つき）はツールチップに出す
+    eq("きっかけの全文はツールチップに" + sz, T.flatMap((g) => g.texts.map((t) => t.full)), ["プロダクトマネージャーが渡す：市場の変化と競合の動き", "定期：四半期ごとの見直し", "プロダクトマネージャーが渡す：顧客からの要望の見直し", "プロダクトマネージャー・アプリケーション開発が渡す：改善の依頼"]);
+    // 見える文字は、全文か、全文の「…が渡す：」を外したもの。切ったときだけ … で終わり、その頭と同じ
+    check("きっかけの見える文字は全文の後ろの一部で、切ったときだけ … で終わる" + sz, T.every((g) => g.texts.every((t) => { const v = t.s.replace(/…$/, ""); const tail = t.full.endsWith(t.s) ? t.s : null; return tail !== null || (t.s.endsWith("…") && t.full.includes(v)); })), JSON.stringify(T.map((g) => g.texts.map((t) => t.s))));
+    // 役割が入るカードの行と同じなら「…が渡す：」を外し、違えば（まとめた A・B を含む）残す
+    eq("役割が行と同じなら「…が渡す：」を外し、違えば残す" + sz, T.flatMap((g) => g.texts.map((t) => g.to + ":" + t.s.includes("が渡す："))), ["p1:false", "p1:false", "p2:false", "p3:true"]);
+    // ラベルの本文（全文の「：」の後ろ）が 4 文字以上見える
+    eq("きっかけのラベルの本文が 4 文字以上見える" + sz, T.flatMap((g) => g.texts.filter((t) => { const body = t.full.slice(t.full.indexOf("：") + 1), v = t.s.replace(/…$/, ""), seen = v.includes("：") ? v.slice(v.indexOf("：") + 1) : v; return !body.startsWith(seen) || [...seen].length < 4; }).map((t) => g.to + ":" + t.s)), []);
+    // (b) 同じノードの 2 本：by と label が同じなら 1 行にまとめ、違えば積む。矢印は 1 本（線と矢じりの 2 つの path）
+    eq("同じノードへの 2 本：違うものは 2 行に積む" + sz, byTo.get("p1").texts.length, 2);
+    eq("同じノードへの 2 本：同じものは 1 行にまとめる" + sz, byTo.get("p3").texts.length, 1);
+    eq("同じノードへのきっかけの矢印は 1 本" + sz, T.map((g) => g.arrows), [2, 2, 2]);
+    check("積んだ 2 行はどちらも画面の中で読める" + sz, byTo.get("p1").texts.every((t) => t.r - t.l > 20 && t.t >= 0 && t.b <= h));
+    // そらまめのきっかけは切れない（役割が行と同じなのでラベルだけ）
+    await open(PAGES.sora + "#a"); await js(HELP);
+    eq("そらまめのきっかけは切れない" + sz, (await js(trigBoxes)).flatMap((g) => g.texts.map((t) => t.s)), ["機能の依頼"]);
+  }
+  await viewport(1440, 900);
+  // (c) a は今の段階を描き、目指す形で足すノードを出さない。c で目指す形を選ぶと出る
+  await open(PAGES.trig + "#a"); await js(HELP);
+  check("a の見出しの頭は今の段階の名前", (await headline()).startsWith("今："), await headline());
+  eq("a に目指す形で足すノードを出さない", await js(`__cards().map((g) => g.dataset.nodeId)`), ["p1", "p2", "p3", "a4", "a5", "g6", "m7"]);
+  await go("c&p=tobe");
+  check("c の目指す形には、足すノードが出る", await js(`["v6", "e8"].every((id) => __vis(document.querySelector("[data-node-id=" + id + "]")))`));
+  await go("a");
+  check("c で段階を選んだあとも、a は今の段階", (await headline()).startsWith("今：") && !(await js(`__vis(document.querySelector("[data-node-id=e8]"))`)));
+  // current が最初の段階でないとき、a は current の段階を描く（最初の段階ではない）
+  await open(PAGES.soraCur + "#a"); await js(HELP);
+  check("current が段階1 なら、a は段階1 を描く", (await headline()).startsWith(soraCur.phases[1].name + "："), await headline());
+
+  // ==== 主な道：描く段階でノードがある最後の段まで。答え合わせの表（answer_key.py）の道と同じ ====
+  const keyPath = (spec) => {
+    const f = join(work, "key-" + Math.random().toString(36).slice(2) + ".json"); writeFileSync(f, spec);
+    const out = execFileSync("python3", ["-I", join(ROOT, "docs/specs/frontier-canvas/answer_key.py"), f]).toString();
+    return out.match(/^- 主な道（[^）]*）：(.*)$/m)[1].split(" → ").filter(Boolean);
+  };
+  const shortOf = (n) => n.short || (n.title.replace(/[（(][^（）()]*[）)]/g, "").replace(/\s+/g, " ").trim() || n.title);
+  for (const [name, page, spec] of [["そらまめ（今）", PAGES.sora, soramameText], ["そらまめ（目指す形を今）", PAGES.soraTobe, JSON.stringify(soraTobe)], ["再現用（今）", PAGES.trig, readFileSync(join(HERE, "triggers.json"), "utf8")]]) {
+    await open(page + "#a"); await js(HELP);
+    const ids = await js(`[...document.querySelectorAll("[data-layer=main] g[data-edge-id]")].filter(__vis).flatMap((g) => g.dataset.edgeId.split(":")[0].split(">"))`);
+    const nm = new Map(JSON.parse(spec).nodes.map((n) => [n.id, shortOf(n)]));
+    eq("主な道が答え合わせの表と同じ：" + name, [...new Set(ids.map((i) => nm.get(i)))].sort(), keyPath(spec).sort());
+  }
+
   // ==== version 1・欠けた仕様書・埋め込みなし ====
   await open(PAGES.v1); await js(HELP);
+  eq("version 1：主な道（phases が無い図は変わらない）", await js(`[...document.querySelectorAll("[data-layer=main] g[data-edge-id]")].filter(__vis).map((g) => g.dataset.edgeId).sort()`), ["a>b:data", "b>c:data", "c>d:data", "d>e:data"]);
   eq("version 1：見出し", await headline(), "原則から評価まで 5 段。人がやるのは入力の 1 段とレビューと評価。");
   await go("b");
   check("version 1：b の一覧", (await js(`document.getElementById("panel").textContent`)).includes("分けるスキルが無い"));
