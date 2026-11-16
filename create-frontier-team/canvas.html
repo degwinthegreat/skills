@@ -290,8 +290,9 @@
   };
 
   // ---- 足りないものと重さの順（設計書の決まったこと 7。数え方は前の図と同じ） ----
-  // 1 戻しにくさ → 2 人の関門と戻り道 → 3 エージェントの段のスキル → 4 検査 → 5 書き漏れ。同じ順の中は流れの上流から。
-  const TIER = { 1: "戻しにくさ", 2: "人の関門と戻り道", 3: "スキル", 4: "検査", 5: "書き漏れ" };
+  // 1 戻しにくさ → 2 無い段 → 3 人の関門と戻り道 → 4 エージェントの段のスキル → 5 検査 → 6 書き漏れ。同じ順の中は流れの上流から。
+  // 無い段：今の段階にノードが無く、あとの段階でノードを足す段。どの段階にもノードが無い段は書き漏れ。
+  const TIER = { 1: "戻しにくさ", 2: "無い段", 3: "人の関門と戻り道", 4: "スキル", 5: "検査", 6: "書き漏れ" };
   const gapsMemo = new Map();
   const gapsAt = (p) => {
     if (gapsMemo.has(p)) return gapsMemo.get(p);
@@ -299,33 +300,39 @@
     const es = edges.filter((e) => aliveAt(e, p) && ids.has(e.from) && ids.has(e.to));
     const st = new Map(ns.map((n) => [n.id, stateAt(n, p)]));
     const out = [];
-    const add = (tier, sub, text, nodeIds, stage, checks = [], scope = "node") => out.push({ tier, sub, text, nodes: nodeIds, stage, checks, scope });
+    const add = (tier, sub, text, nodeIds, stage, checks = [], scope = "node", plan = "") => out.push({ tier, sub, text, nodes: nodeIds, stage, checks, scope, plan });
     const last = stages[stages.length - 1].id;
     stages.forEach((s) => {
       const ins = ns.filter((n) => n.stage === s.id);
-      if (!ins.length) add(5, 0, `段「${s.name}」にノードが無い`, [], s.id, [], "stage");
-      else if (ins.every((n) => st.get(n.id).isGap)) add(3, 0, `段「${s.name}」に、スキルの決まったノードが無い`, ins.map((n) => n.id), s.id);
+      // あとの段階で足すなら「無い段」。足すノードは項目の nodes に入れない（今の図に無いカードを選ばないように）
+      const q = ins.length ? -1 : phases.findIndex((_, i) => i > p && nodes.some((n) => n.stage === s.id && aliveAt(n, i)));
+      if (q >= 0) {
+        const ids = nodes.filter((n) => n.stage === s.id && aliveAt(n, q)).map((n) => n.id);
+        const plan = phShort(q) + " で" + ids.slice(0, 2).map((id) => "「" + short(id) + "」").join("と") + (ids.length > 2 ? "ほか " + (ids.length - 2) + " つ" : "") + "を足す予定";
+        add(2, 0, `段「${s.name}」が無い（${plan}）`, [], s.id, [], "stage", plan);
+      } else if (!ins.length) add(6, 0, `段「${s.name}」にノードが無い`, [], s.id, [], "stage");
+      else if (ins.every((n) => st.get(n.id).isGap)) add(4, 0, `段「${s.name}」に、スキルの決まったノードが無い`, ins.map((n) => n.id), s.id);
     });
     ns.forEach((n) => {
       const x = st.get(n.id); if (!x.own) return;
       const text = x.gap || "欠けている：" + x.tags.join("、");
       if (n.kind === "gate") add(1, RR[n.risk] ?? 3, text, [n.id], n.stage);
-      else if (n.session === "plan" || n.session === "run") add(3, 0, text, [n.id], n.stage);
-      else add(5, 0, text, [n.id], n.stage);
+      else if (n.session === "plan" || n.session === "run") add(4, 0, text, [n.id], n.stage);
+      else add(6, 0, text, [n.id], n.stage);
     });
-    ns.forEach((n) => st.get(n.id).checkGaps.forEach((c) => add(4, RR[n.risk] ?? 3, textAt(c.gaps, p), [n.id], n.stage, [c.key])));
-    if (!es.some((e) => e.kind === "learn")) add(2, 0, "学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", [], last, [], "flow");
-    if (!es.some((e) => e.kind === "fix")) add(2, 0, "直しの辺が無い（関門から、その単位を作った実行へ差し戻す矢印）", [], last, [], "flow");
+    ns.forEach((n) => st.get(n.id).checkGaps.forEach((c) => add(5, RR[n.risk] ?? 3, textAt(c.gaps, p), [n.id], n.stage, [c.key])));
+    if (!es.some((e) => e.kind === "learn")) add(3, 0, "学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", [], last, [], "flow");
+    if (!es.some((e) => e.kind === "fix")) add(3, 0, "直しの辺が無い（関門から、その単位を作った実行へ差し戻す矢印）", [], last, [], "flow");
     const humans = ns.filter((n) => n.human);
-    if (humans.length !== 1) add(2, 0, `人を置く関門が ${humans.length} か所（1 か所、いちばん重くて戻しにくい所に置く）`, humans.map((n) => n.id), (humans[0] || ns[0] || { stage: last }).stage, [], humans.length ? "node" : "flow");
-    ns.filter((n) => n.layer !== "upstream" && n.session === "human" && !n.human).forEach((n) => add(2, 0, "流れの途中に人がいる（人を置くのは 1 か所に絞る）", [n.id], n.stage));
+    if (humans.length !== 1) add(3, 0, `人を置く関門が ${humans.length} か所（1 か所、いちばん重くて戻しにくい所に置く）`, humans.map((n) => n.id), (humans[0] || ns[0] || { stage: last }).stage, [], humans.length ? "node" : "flow");
+    ns.filter((n) => n.layer !== "upstream" && n.session === "human" && !n.human).forEach((n) => add(3, 0, "流れの途中に人がいる（人を置くのは 1 か所に絞る）", [n.id], n.stage));
     ns.filter((n) => n.kind === "gate" && !RISK[n.risk]).forEach((n) => add(1, 3, "戻しにくさが書かれていない", [n.id], n.stage));
     ns.filter((n) => n.kind === "gate" && n.risk === "irreversible" && !n.human).forEach((n) => add(1, 0, "戻せない変更を、人を置かずに通している", [n.id], n.stage));
-    ns.filter((n) => (n.kind === "work" || n.kind === "gate") && !n.check && !(st.get(n.id).checks.length && st.get(n.id).checks.every((c) => c.check))).forEach((n) => add(4, 3, "判定（プログラムで評価できる形）が書かれていない", [n.id], n.stage));
-    ns.filter((n) => n.layer !== "upstream" && !KIND[n.kind]).forEach((n) => add(5, 0, "ノードの種類（分ける・作業・コード・関門）が書かれていない", [n.id], n.stage));
-    if (D.version == null) add(5, 0, "仕様書に version が無い（この図は version 2 の形として読んだ）", [], last, [], "flow");
-    else if (![1, 2].includes(Number(D.version))) add(5, 0, `仕様書の version が ${D.version}（この図が読むのは version 1 と 2）`, [], last, [], "flow");
-    problems.forEach((t) => add(5, 0, t, [], last, [], "flow"));
+    ns.filter((n) => (n.kind === "work" || n.kind === "gate") && !n.check && !(st.get(n.id).checks.length && st.get(n.id).checks.every((c) => c.check))).forEach((n) => add(5, 3, "判定（プログラムで評価できる形）が書かれていない", [n.id], n.stage));
+    ns.filter((n) => n.layer !== "upstream" && !KIND[n.kind]).forEach((n) => add(6, 0, "ノードの種類（分ける・作業・コード・関門）が書かれていない", [n.id], n.stage));
+    if (D.version == null) add(6, 0, "仕様書に version が無い（この図は version 2 の形として読んだ）", [], last, [], "flow");
+    else if (![1, 2].includes(Number(D.version))) add(6, 0, `仕様書の version が ${D.version}（この図が読むのは version 1 と 2）`, [], last, [], "flow");
+    problems.forEach((t) => add(6, 0, t, [], last, [], "flow"));
     // 同じ理由の文は 1 行にまとめる（「CI がまだ無い」が 3 つの検査にあれば、検査の名前を添えて 1 行）
     const list = [];
     out.forEach((o) => {
@@ -642,6 +649,8 @@
       const l = G.list;
       if (!l.length) return [(phases.length ? "今の段階「" + phName(p) + "」で" : "") + "足りないものは無い。", at + "　" + teamLine];
       const t = l[0], nm = t.nodes.length ? "「" + t.nodes.map(short).join("・") + "」" : gapWho(t);
+      // 無い段が 1 位なら、置き換える予定と同じ形で段の後に添える（段の名前を 2 度言わない）
+      if (t.plan) return ["次に直すのは" + nm + "（" + t.plan + "）：今はこの段にノードが無い。", at + "足りないもの " + l.length + " 件（重さの順に右の一覧）　" + teamLine];
       return ["次に直すのは" + nm + laterNote(t) + "：" + t.text.split("。")[0] + (t.checkTitles.length > 1 ? "（" + t.checkTitles.join("・") + "）" : "") + "。",
         at + "足りないもの " + l.length + " 件（重さの順に右の一覧）　" + teamLine];
     }
@@ -997,7 +1006,7 @@
       row("関わり", invText);
       if (n.kind === "gate") row("戻しにくさ", RISK[n.risk] || "書かれていない");
       row("判定", n.check || "—"); row("スキル", n.skills.join("、") || "—");
-      const g = G.list.filter((o) => o.nodes.includes(id) && !(o.checks.length && o.tier === 4));
+      const g = G.list.filter((o) => o.nodes.includes(id) && !(o.checks.length && o.tier === 5));
       if (g.length) row("足りない", lines(g.map((o) => (o === first ? "【次に直す】" : "") + o.text + (o === first ? laterNote(o) : ""))));
       const cks = n.checks.filter((c) => aliveAt(c, p));
       if (cks.length) {

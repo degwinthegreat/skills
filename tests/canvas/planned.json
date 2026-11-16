@@ -1,0 +1,36 @@
+{
+  "version": 2,
+  "team": "えだまめ（架空）",
+  "stages": [
+    { "id": "spec", "name": "仕様" },
+    { "id": "run", "name": "実行" },
+    { "id": "check", "name": "検証" },
+    { "id": "ship", "name": "出荷" },
+    { "id": "eval", "name": "評価" }
+  ],
+  "roles": [
+    { "id": "lead", "name": "リード", "actor": "human", "decides": true },
+    { "id": "agent", "name": "エージェント" }
+  ],
+  "phases": [
+    { "id": "now", "name": "今", "current": true, "note": "評価の段がまだ無い" },
+    { "id": "next", "name": "段階1：評価を足す", "note": "流れを評価して、仕様へ戻す" }
+  ],
+  "nodes": [
+    { "id": "s1", "stage": "spec", "role": "lead", "layer": "upstream", "title": "仕様を書く", "kind": "work", "session": "human", "check": "完了の条件がはい・いいえで書ける" },
+    { "id": "r1", "stage": "run", "role": "agent", "title": "実装", "kind": "work", "session": "run", "skills": ["implement"], "check": "テストが通る" },
+    { "id": "c1", "stage": "check", "role": "lead", "title": "検証の関門", "kind": "gate", "human": true, "check": "テストと型が通る" },
+    { "id": "e1", "stage": "eval", "role": "lead", "layer": "upstream", "title": "流れの評価", "kind": "work", "session": "human", "check": "週ごとの指標を読む", "since": "next" },
+    { "id": "e2", "stage": "eval", "role": "agent", "title": "指標を集める", "kind": "code", "since": "next" },
+    { "id": "e3", "stage": "eval", "role": "agent", "title": "失敗を分ける", "kind": "work", "session": "plan", "skills": ["triage"], "check": "失敗に理由の札が付く", "since": "next" }
+  ],
+  "edges": [
+    { "from": "s1", "to": "r1" },
+    { "from": "r1", "to": "c1" },
+    { "from": "c1", "to": "r1", "kind": "fix", "label": "通らなければ戻す" },
+    { "from": "c1", "to": "e2", "since": "next" },
+    { "from": "e2", "to": "e3", "since": "next" },
+    { "from": "e3", "to": "e1", "since": "next" },
+    { "from": "e1", "to": "s1", "kind": "learn", "label": "学びを仕様へ", "since": "next" }
+  ]
+}

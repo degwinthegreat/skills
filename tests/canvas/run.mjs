@@ -2,7 +2,7 @@
 // 設計書（docs/specs/frontier-canvas.md）の「操作」の試験と、「図の直しの完了」のうち機械で確かめられるものを見る。
 //
 //   node tests/canvas/run.mjs                 # 試験だけ
-//   node tests/canvas/run.mjs --shots <dir>   # 画面も撮る（1440×900 と 1280×800）
+//   node tests/canvas/run.mjs --shots <dir>   # 画面も撮る（1440×900 と 1280×800。無い段の b は 1280×800 と 390×844）
 //
 // Chrome の場所は環境変数 CHROME で渡せる。無ければよくある場所を探す。起動した Chrome は、終わりに自分の PID だけを止める。
 import { spawn, execFileSync } from "node:child_process";
@@ -51,7 +51,11 @@ const embedMiss = (() => {
 })();
 const soraCur = JSON.parse(soramameText); soraCur.phases[1].current = true; // 段階1 を「今」にした版
 const soraTobe = JSON.parse(soramameText); soraTobe.phases[3].current = true; // 目指す形を「今」にした版（a の描き方を、全部のカードで見る）
+const plannedText = readFileSync(join(HERE, "planned.json"), "utf8");
+const plannedRisk = JSON.parse(plannedText); plannedRisk.nodes.find((n) => n.id === "c1").risk = "narrow"; // 戻しにくさの項目が無い版
 const PAGES = {
+  planned: embed(plannedText, null, "planned.html"),
+  plannedRisk: embed(JSON.stringify(plannedRisk), null, "planned-risk.html"),
   sora: embed(soramameText, overlayText, "soramame.html"),
   soraTobe: embed(JSON.stringify(soraTobe), overlayText, "soramame-tobe.html"),
   trig: embed(readFileSync(join(HERE, "triggers.json"), "utf8"), null, "triggers.html"),
@@ -242,8 +246,8 @@ try {
   await go("b");
   eq("見出し b（1 位がこの先で置き換わることを添える）", await headline(), "次に直すのは「人のレビュー」（段階1 で置き換える予定）：レビューの観点が書かれていない。");
   eq("b の一覧（重さの順。1 位に置き換える予定）", await js(`[...document.querySelectorAll("#gapList [role=option]")].map((o) => o.textContent)`),
-    ["人のレビューレビューの観点が書かれていない段階1 で置き換える予定", "人のレビュー流れの途中に人がいる（人を置くのは 1 か所に絞る）", "流れ全体学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", "人のレビュー段「検証」に、スキルの決まったノードが無い", "段「評価」段「評価」にノードが無い"]);
-  eq("b の重さの段", await js(`[...document.querySelectorAll("#gapList [role=group]")].map((g) => document.getElementById(g.getAttribute("aria-labelledby")).textContent)`), ["戻しにくさ", "人の関門と戻り道", "スキル", "書き漏れ"]);
+    ["人のレビューレビューの観点が書かれていない段階1 で置き換える予定", "段「評価」段「評価」が無い（目指す形 で「指標を集める」と「評価・学び」を足す予定）", "人のレビュー流れの途中に人がいる（人を置くのは 1 か所に絞る）", "流れ全体学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", "人のレビュー段「検証」に、スキルの決まったノードが無い"]);
+  eq("b の重さの段", await js(`[...document.querySelectorAll("#gapList [role=group]")].map((g) => document.getElementById(g.getAttribute("aria-labelledby")).textContent)`), ["戻しにくさ", "無い段", "人の関門と戻り道", "スキル"]);
   check("b は今の段階で判定（見出しの下と一覧）", (await js(`document.getElementById("v").textContent`)).includes("今の段階「今」で判定") && (await js(`document.getElementById("panel").textContent`)).includes("今の段階「今」で判定"));
   eq("赤は 1 位のカードだけ", await js(`[...document.querySelectorAll(".card")].filter((g) => __vis(g) && g.innerHTML.toLowerCase().includes("#c23a22")).map((g) => g.dataset.nodeId)`), ["n8h"]);
   eq("b の既定では戻り道の線を出さない", await js(`[...document.querySelectorAll("[data-layer=back] g")].filter(__vis).length`), 0);
@@ -263,8 +267,8 @@ try {
   await open(PAGES.soraCur + "#b"); await js(HELP);
   const curList = await js(`[...document.querySelectorAll("#gapList [role=option]")].map((o) => o.textContent)`);
   eq("段階1 が今：件数", curList.length, 3);
-  check("段階1 が今：1 位は学びの辺", curList[0].includes("学びの辺が無い"), curList[0]);
-  check("段階1 が今：1 位がこの先で消えないなら「予定」を書かない", !(await headline()).includes("予定") && !curList[0].includes("予定"), await headline());
+  check("段階1 が今：1 位は目指す形で足す評価の段、2 位は学びの辺", curList[0].startsWith("段「評価」段「評価」が無い（目指す形 で") && curList[1].includes("学びの辺が無い"), JSON.stringify(curList));
+  check("段階1 が今：1 位のカードが無いなら「置き換える・無くす予定」を書かない", !/で(置き換える|無くす)予定/.test(await headline()) && !(await js(`!!document.querySelector("#gapList .first small")`)), await headline());
   check("段階1 が今：CI の 3 行が 1 行に", curList.filter((t) => t.includes("CI がまだ無い")).length === 1 && curList.some((t) => t.includes("CI がまだ無い（テスト・型・lint）")), JSON.stringify(curList));
   await js(`[...document.querySelectorAll("#gapList [role=option]")].find((o) => o.textContent.includes("CI")).click(); true`);
   eq("検査の足りないものを選ぶと関門の中の検査を示す", await js(`[...document.querySelectorAll("#tip li[aria-current=true]")].map((l) => l.dataset.checkId)`), ["n7/test", "n7/type", "n7/lint"]);
@@ -289,7 +293,7 @@ try {
   // 問い c3：選んだ段階の足りないものを、中身まで（b と同じまとめ方。同じ理由は 1 行）
   const cGaps = {};
   for (const p of ["asis", "step1", "step2", "tobe"]) { await go("c&p=" + p); cGaps[p] = await js(`[...document.querySelectorAll("#phaseList [aria-selected=true] li")].map((l) => l.textContent)`); }
-  eq("c：段階1 の足りないものの中身", cGaps.step1, ["流れ全体学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", "決定的な検査CI がまだ無い（テスト・型・lint）", "段「評価」段「評価」にノードが無い"]);
+  eq("c：段階1 の足りないものの中身", cGaps.step1, ["段「評価」段「評価」が無い（目指す形 で「指標を集める」と「評価・学び」を足す予定）", "流れ全体学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", "決定的な検査CI がまだ無い（テスト・型・lint）"]);
   eq("c：中身の行の数は足りないものの数と同じ", [cGaps.asis.length, cGaps.step1.length, cGaps.step2.length, cGaps.tobe.length], [5, 3, 3, 1]);
   eq("c：選んでいない段階には中身を出さない", await js(`[...document.querySelectorAll("#phaseList [aria-selected=false] li")].length`), 0);
   check("c：一覧に赤を使わない", !(await js(`[...document.querySelectorAll("#panel *")].some((e) => /rgb\(194, 58, 34\)/.test(getComputedStyle(e).color + getComputedStyle(e).borderColor))`)));
@@ -391,6 +395,7 @@ try {
   for (let i = 0; i < 3; i++) { await press("Tab"); ob.push(await active()); }
   eq("Tab の順（b）：表 → 図 → 一覧", ob, ["#tableBtn", "card:n8h", "option:gapList:g0"]);
   await press("ArrowDown"); eq("一覧で ↓", await active(), "option:gapList:g1");
+  await press("ArrowDown"); eq("一覧で ↓（2 回目）", await active(), "option:gapList:g2");
   await press("Enter"); eq("一覧で Enter で選ぶ", await js(`document.querySelector(".card[aria-expanded=true]")?.dataset.nodeId`), "n8h");
   await press("Tab", true); eq("Shift+Tab で図へ", await active(), "card:n8h");
   await press("Tab"); eq("選んだカードから Tab で窓の中へ", await active(), "tip:x");
@@ -497,6 +502,24 @@ try {
   await open(PAGES.soraCur + "#a"); await js(HELP);
   check("current が段階1 なら、a は段階1 を描く", (await headline()).startsWith(soraCur.phases[1].name + "："), await headline());
 
+  // ==== 無い段：今の段階にノードが無く、あとの段階で足す段（決まったこと 7。情報 I2） ====
+  const gapOpts = () => js(`[...document.querySelectorAll("#gapList [role=option]")].map((o) => o.textContent)`);
+  const gapTiers = () => js(`[...document.querySelectorAll("#gapList [role=group]")].map((g) => document.getElementById(g.getAttribute("aria-labelledby")).textContent)`);
+  await open(PAGES.planned + "#b"); await js(HELP);
+  eq("無い段：戻しにくさの直後に出る", await gapTiers(), ["戻しにくさ", "無い段", "人の関門と戻り道", "書き漏れ"]);
+  eq("無い段：一覧（足すノードは 2 つまで、ほか N つ）", await gapOpts(),
+    ["検証の関門戻しにくさが書かれていない", "段「評価」段「評価」が無い（段階1 で「流れの評価」と「指標を集める」ほか 1 つを足す予定）", "流れ全体学びの辺が無い（評価から、分ける所か入力へ戻す矢印）", "段「出荷」段「出荷」にノードが無い"]);
+  eq("どの段階にもノードが無い段は、書き漏れのまま", await js(`[...document.querySelectorAll("#gapList [role=group]")].find((g) => g.textContent.startsWith("書き漏れ")).textContent`), "書き漏れ段「出荷」段「出荷」にノードが無い");
+  await open(PAGES.plannedRisk + "#b"); await js(HELP);
+  eq("無い段が 1 位：見出し", await headline(), "次に直すのは段「評価」（段階1 で「流れの評価」と「指標を集める」ほか 1 つを足す予定）：今はこの段にノードが無い。");
+  check("無い段が 1 位：一覧の先頭", (await gapOpts())[0].startsWith("段「評価」段「評価」が無い"), (await gapOpts())[0]);
+  await js(`document.querySelector("#gapList [role=option]").click(); true`);
+  eq("無い段を押す：書き漏れの段と同じく、カードは選ばない", [await js(`document.querySelector("#gapList [aria-selected=true]").dataset.key`), await js(`document.querySelectorAll(".card[aria-expanded=true]").length`)], ["g0", 0]);
+  await js(`[...document.querySelectorAll("#gapList [role=option]")].find((o) => o.textContent.includes("出荷")).click(); true`);
+  eq("書き漏れの段を押す：カードは選ばない", await js(`document.querySelectorAll(".card[aria-expanded=true]").length`), 0);
+  await go("c&p=next");
+  check("無い段：あとの段階では出ない", !(await js(`document.getElementById("phaseList").textContent`)).includes("段「評価」"));
+
   // ==== 主な道：描く段階でノードがある最後の段まで。答え合わせの表（answer_key.py）の道と同じ ====
   const keyPath = (spec) => {
     const f = join(work, "key-" + Math.random().toString(36).slice(2) + ".json"); writeFileSync(f, spec);
@@ -536,6 +559,14 @@ try {
         await go(hash); await shot(sz + "-" + name);
       }
       if (w === 1280) { await go("b"); await js(`document.getElementById("fold").click(); true`); await shot(sz + "-b-folded"); }
+    }
+    // 無い段（架空のえだまめ）：見方 b を 1280 と 390 で
+    for (const [w, h] of [[1280, 800], [390, 844]]) {
+      await viewport(w, h);
+      for (const [name, page] of [["planned-b", PAGES.planned], ["planned-risk-b", PAGES.plannedRisk]]) {
+        await open(page + "#b"); await shot(w + "x" + h + "-" + name);
+        if (process.env.DEBUG) console.log(name, w, await js(`[document.documentElement.scrollWidth, innerWidth, document.getElementById("headline").scrollWidth, document.getElementById("headline").clientWidth]`));
+      }
     }
   }
   eq("コンソールにエラーが無い", errors, []);

@@ -8,6 +8,7 @@
     python3 docs/specs/frontier-canvas/answer_key.py docs/specs/frontier-canvas/soramame.json > out.md
 """
 import json
+import re
 import sys
 
 SESSION = {"plan", "run", "human"}
@@ -17,7 +18,15 @@ RISK_JA = {"irreversible": "戻せない", "wide": "戻せるが広い", "narrow
 GROUP_JA = {"input": "入力", "routing": "振り分け", "candidate": "候補", "output": "出力"}
 INV_JA = {"cond": "条件で人", "human": "人がやる", "agent": "エージェントがやる", "auto": "自動"}
 BY_JA = {"human": "人", "schedule": "定期", "event": "イベント"}
-RANK_JA = {1: "戻しにくさ", 2: "人の関門と戻り道", 3: "エージェントの段のスキル", 4: "検査", 5: "書き漏れ"}
+RANK_JA = {1: "戻しにくさ", 2: "無い段", 3: "人の関門と戻り道", 4: "エージェントの段のスキル", 5: "検査", 6: "書き漏れ"}
+
+
+def card(n):
+    """カードの短い名前（図の shortTitle と同じ：short が無ければ、題名から括弧の中を外す）。"""
+    if n.get("short"):
+        return n["short"]
+    t = " ".join(re.sub(r"[（(][^（）()]*[）)]", "", n["title"]).split())
+    return t or n["title"]
 
 
 def arr(v):
@@ -107,10 +116,17 @@ def main(path):
         pos = lambda n: sidx[n["stage"]]
         for s in stages:
             inside = [n for n in ns if n["stage"] == s["id"]]
-            if not inside:
-                out.append((5, sidx[s["id"]], f"段「{s['name']}」にノードが無い", "段:" + s["id"], f"段「{s['name']}」にノードが無い"))
+            # 無い段：今の段階にノードが無く、あとの段階でノードを足す段（決まったこと 7）
+            q = next((i for i in range(p + 1, len(phases)) if any(n["stage"] == s["id"] and alive(n, i) for n in nodes)), None) if not inside else None
+            if q is not None:
+                names = [card(n) for n in nodes if n["stage"] == s["id"] and alive(n, q)]
+                plan = phases[q]["name"].split("：")[0].strip() + " で" + "と".join(f"「{x}」" for x in names[:2]) + (f"ほか {len(names) - 2} つ" if len(names) > 2 else "") + "を足す予定"
+                t = f"段「{s['name']}」が無い（{plan}）"
+                out.append((2, sidx[s["id"]], t, "段:" + s["id"], t))
+            elif not inside:
+                out.append((6, sidx[s["id"]], f"段「{s['name']}」にノードが無い", "段:" + s["id"], f"段「{s['name']}」にノードが無い"))
             elif all(st[n["id"]]["is_gap"] for n in inside):
-                out.append((3, sidx[s["id"]], f"段「{s['name']}」に、スキルの決まったノードが無い", "段:" + s["id"], f"段「{s['name']}」に、スキルの決まったノードが無い"))
+                out.append((4, sidx[s["id"]], f"段「{s['name']}」に、スキルの決まったノードが無い", "段:" + s["id"], f"段「{s['name']}」に、スキルの決まったノードが無い"))
         for n in ns:
             x = st[n["id"]]
             if x["is_gap"] and (x["gap"] or x["tags"]):
@@ -118,34 +134,34 @@ def main(path):
                 if n.get("kind") == "gate":
                     rank, sub = 1, RISK_ORDER.get(n.get("risk"), 3)
                 elif n["_sess"] in ("plan", "run"):
-                    rank, sub = 3, 0
+                    rank, sub = 4, 0
                 else:
-                    rank, sub = 5, 0
+                    rank, sub = 6, 0
                 out.append((rank, sub * 100 + pos(n), why, n["id"], f"{sname[n['stage']]} / {roles.get(n['role'], {}).get('name', n['role'])} の「{n['title']}」：{why}"))
         for n in ns:
             for c in st[n["id"]]["checks"]:
                 g = gaps_at(c.get("gap"), p)
                 if g:
-                    out.append((4, RISK_ORDER.get(n.get("risk"), 3) * 100 + pos(n), g, n["id"] + "/" + c["id"], f"関門「{n['title']}」の検査「{c['title']}」：{g}"))
+                    out.append((5, RISK_ORDER.get(n.get("risk"), 3) * 100 + pos(n), g, n["id"] + "/" + c["id"], f"関門「{n['title']}」の検査「{c['title']}」：{g}"))
         humans = [n for n in ns if n.get("human") is True]
         if len(humans) != 1:
-            out.append((2, 0, "人を置く関門の数", "-", f"人を置く関門が {len(humans)} か所"))
+            out.append((3, 0, "人を置く関門の数", "-", f"人を置く関門が {len(humans)} か所"))
         for n in ns:
             if n["layer"] != "upstream" and n["_sess"] == "human" and n.get("human") is not True:
-                out.append((2, 10 + pos(n), "流れの途中に人", n["id"], f"「{n['title']}」：タスクの流れの途中に人がいる"))
+                out.append((3, 10 + pos(n), "流れの途中に人", n["id"], f"「{n['title']}」：タスクの流れの途中に人がいる"))
         if not any(e["kind"] == "fix" for e in es):
-            out.append((2, 50, "直しの辺が無い", "-", "直しの辺が無い"))
+            out.append((3, 50, "直しの辺が無い", "-", "直しの辺が無い"))
         if not any(e["kind"] == "learn" for e in es):
-            out.append((2, 60, "学びの辺が無い", "-", "学びの辺が無い（評価から、分ける所の指示か上流へ戻す矢印）"))
+            out.append((3, 60, "学びの辺が無い", "-", "学びの辺が無い（評価から、分ける所の指示か上流へ戻す矢印）"))
         for n in ns:
             if n.get("kind") == "gate" and n.get("risk") not in RISK_ORDER:
                 out.append((1, 300 + pos(n), "戻しにくさが書かれていない", n["id"], f"関門「{n['title']}」：戻しにくさが書かれていない"))
             if n.get("kind") == "gate" and n.get("risk") == "irreversible" and n.get("human") is not True:
                 out.append((1, pos(n), "戻せない変更を人を置かずに通す", n["id"], f"関門「{n['title']}」：戻せない変更を、人を置かずに通している"))
             if n.get("kind") in ("work", "gate") and not n.get("check") and not (st[n["id"]]["checks"] and all(c.get("check") for c in st[n["id"]]["checks"])):
-                out.append((4, 900 + pos(n), "判定が書かれていない", n["id"], f"「{n['title']}」：判定が書かれていない"))
+                out.append((5, 900 + pos(n), "判定が書かれていない", n["id"], f"「{n['title']}」：判定が書かれていない"))
             if n["layer"] != "upstream" and n.get("kind") not in KIND:
-                out.append((5, 900 + pos(n), "種類が書かれていない", n["id"], f"「{n['title']}」：ノードの種類が書かれていない"))
+                out.append((6, 900 + pos(n), "種類が書かれていない", n["id"], f"「{n['title']}」：ノードの種類が書かれていない"))
         out.sort(key=lambda t: (t[0], t[1]))
         # 同じ理由の文は 1 つにまとめる（決まったこと 7）。
         merged = []
