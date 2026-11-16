@@ -18,7 +18,7 @@ const SORAMAME = join(ROOT, "docs/specs/frontier-canvas/soramame.json");
 const args = process.argv.slice(2);
 const SHOTS = args.includes("--shots") ? resolve(args[args.indexOf("--shots") + 1]) : null;
 
-// ---- 埋め込み（SKILL.md の進め方の 4 と同じ置き換え） ----
+// ---- 埋め込み（SKILL.md の進め方の 4 の scripts/embed.sh と同じ置き換え。embed.sh はこれとバイトで比べる） ----
 const work = mkdtempSync(join(tmpdir(), "canvas-test-"));
 const embed = (spec, overlay, name) => {
   let h = readFileSync(CANVAS, "utf8");
@@ -28,6 +28,27 @@ const embed = (spec, overlay, name) => {
 };
 const soramameText = readFileSync(SORAMAME, "utf8");
 const overlayText = readFileSync(join(HERE, "soramame-overlay.json"), "utf8");
+
+// ---- scripts/embed.sh（ブラウザを使わない所） ----
+const EMBED = join(ROOT, "create-frontier-team/scripts/embed.sh");
+const sh = (...a) => { try { execFileSync("sh", [EMBED, ...a], { stdio: ["ignore", "ignore", "pipe"] }); return 0; } catch (e) { return e.status; } };
+const closeSpec = JSON.stringify({ version: 2, team: "</script><b>閉じる</b>", stages: [{ id: "s", name: "段" }], nodes: [{ id: "n1", stage: "s", title: "a</b>c" }] }) + "\n";
+writeFileSync(join(work, "close.json"), closeSpec);
+const embedSh = [
+  ["embed.sh：仕様書と注記の埋め込みが、試験の埋め込みとバイトで同じ", [SORAMAME, join(HERE, "soramame-overlay.json")], embed(soramameText, overlayText, "js-sora.html")],
+  ["embed.sh：仕様書だけの埋め込みが、試験の埋め込みとバイトで同じ", [join(HERE, "v1.json")], embed(readFileSync(join(HERE, "v1.json"), "utf8"), null, "js-v1.html")],
+  ["embed.sh：</ を <\\/ に変える", [join(work, "close.json")], embed(closeSpec, null, "js-close.html")],
+].map(([name, [spec, ov], want], i) => {
+  const out = join(work, "sh-" + i + ".html");
+  const st = sh(CANVAS, spec, out, ...(ov ? [ov] : []));
+  return [name, st === 0 && readFileSync(out).equals(readFileSync(fileURLToPath(want))), out];
+});
+const shClose = "file://" + embedSh[2][2];
+const embedMiss = (() => {
+  const plain = join(work, "plain.html"); writeFileSync(plain, "<html>埋め込み口が無い</html>\n");
+  const out = join(work, "miss.html");
+  return { noMarker: sh(plain, SORAMAME, out), wrote: existsSync(out), twice: sh(embedSh[0][2], SORAMAME, join(work, "twice.html")), args: sh(CANVAS, SORAMAME) };
+})();
 const soraCur = JSON.parse(soramameText); soraCur.phases[1].current = true; // 段階1 を「今」にした版
 const soraTobe = JSON.parse(soramameText); soraTobe.phases[3].current = true; // 目指す形を「今」にした版（a の描き方を、全部のカードで見る）
 const PAGES = {
@@ -129,6 +150,15 @@ const HELP = `
   true;`;
 
 try {
+  // ==== scripts/embed.sh ====
+  embedSh.forEach(([name, ok]) => check(name, ok));
+  check("embed.sh：/*DESIGN*/null が無ければエラーで止まり、何も書かない", embedMiss.noMarker !== 0 && !embedMiss.wrote);
+  check("embed.sh：埋め込み済みの図に重ねて埋め込むとエラー", embedMiss.twice !== 0);
+  eq("embed.sh：引数が足りなければ使い方を出して 2 で止まる", embedMiss.args, 2);
+  await viewport(1440, 900);
+  await open(shClose + "#a"); await js(HELP);
+  eq("embed.sh：</script> を含む仕様書でも図が開く", await js(`document.querySelector("[data-node-id=n1]") ? document.title : "なし"`), "</script><b>閉じる</b> の流れ");
+
   // ==== そらまめ 1440×900 ====
   await viewport(1440, 900);
   await open(PAGES.sora); await js(HELP);
