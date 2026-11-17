@@ -43,6 +43,14 @@
   .card:focus-visible .focus { display: inline; }
   .empty { padding: 60px 40px; color: #5d5850; font-size: 14px; }
 
+  /* 狭い幅の b：図の倍率で見出しが 14px を下回るときだけ、見出しを図の外（上、全幅）に出し、ふつうの大きさで読む。図と一覧はその下から */
+  #hlSub { display: none; }
+  body[data-hl-out] #hl { position: fixed; left: 0; right: 0; top: 54px; padding: 0 16px 10px; background: #fbfaf7; border-bottom: 1px solid #e3ded5; z-index: 4; }
+  body[data-hl-out] #headline { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; margin: 0; font-size: 16px; font-weight: 600; line-height: 1.5; color: #3d3b38; }
+  body[data-hl-out] #hlSub { display: block; margin: 3px 0 0; font-size: 12px; line-height: 1.5; color: #857f76; }
+  body[data-hl-out] #wrap, body[data-hl-out] #panel { top: var(--hl-b, 0px); }
+  body[data-hl-out] #panel { padding-top: 12px; }
+
   /* 横の一覧（b・c） */
   #panel { position: fixed; top: 0; right: 0; bottom: 0; width: 270px; padding: 62px 16px 20px; background: #f6f3ee; border-left: 1px solid #e3ded5; overflow: auto; font-size: 12.5px; line-height: 1.6; display: none; }
   body[data-view="b"] #panel, body[data-view="c"] #panel { display: block; }
@@ -125,7 +133,7 @@
   <span class="sep" aria-hidden="true"></span>
   <button type="button" id="tableBtn" aria-pressed="false" aria-controls="table">表</button>
 </nav>
-<h1 class="sr" id="headline"></h1>
+<div id="hl"><h1 class="sr" id="headline"></h1><p id="hlSub" aria-hidden="true"></p></div>
 <div id="live" class="sr" aria-live="polite"></div>
 <main id="wrap" role="tabpanel"></main>
 <aside id="panel" aria-label="一覧"></aside>
@@ -667,7 +675,7 @@
   };
 
   // ---- 見方・段階・選びを描く（カードと線は出す・隠すだけ） ----
-  const live = document.getElementById("live"), hlEl = document.getElementById("headline");
+  const live = document.getElementById("live"), hlEl = document.getElementById("headline"), hlSub = document.getElementById("hlSub"), hlBox = document.getElementById("hl");
   let lastSpoken = "";
   const render = () => {
     const view = S.view, p = effP();
@@ -686,19 +694,27 @@
     document.querySelectorAll("#views [role=tab]").forEach((b) => { const on = b.dataset.v === view; b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1; });
     wrap.setAttribute("aria-labelledby", "tab-" + view);
     renderFold();
+
+    // 見出し
+    const [h1, h2] = headline(view, p, G, df);
+    hl1.style.display = hl2.style.display = ""; // 字の長さを測るため、いったん出す
+    hl1.textContent = h1; hl1.setAttribute("font-size", view === "a" ? 25 : 23);
+    for (let fs = view === "a" ? 25 : 23; fs > 16 && hl1.getComputedTextLength() > vw - 330; fs -= 1) hl1.setAttribute("font-size", fs - 1);
+    hl2.textContent = h2; hlEl.textContent = h1; hlSub.textContent = h2;
+    // 狭い幅の b：縮める前の字（23）でも図の倍率で 14px を下回るなら、見出しを図の外（上）に出す。1280 幅（倍率 0.7 ほど）は図の中のまま
+    document.body.removeAttribute("data-hl-out");
+    const out = view === "b" && !S.table && (() => { const r = wrap.getBoundingClientRect(); return Math.min(r.width / vw, r.height / H) * 23 < 14; })();
+    document.body.toggleAttribute("data-hl-out", out);
+    hl1.style.display = hl2.style.display = out ? "none" : "";
+    document.body.style.setProperty("--hl-b", out ? Math.ceil(hlBox.getBoundingClientRect().bottom) + "px" : "");
+    const spoken = view + ":" + p;
+    if (spoken !== lastSpoken) { live.textContent = h1; lastSpoken = spoken; }
+
     // 図の倍率で名前が 14px を下回るなら、名前の字を大きくする（1280 幅の b・c。見せ方 V1）
     if (!S.table) {
       const wr = wrap.getBoundingClientRect(), sc = Math.min(wr.width / vw, wr.height / H);
       nameFS = sc > 0 ? Math.min(21, Math.max(NAME, Math.ceil(14.05 / sc * 2) / 2)) : NAME;
     }
-
-    // 見出し
-    const [h1, h2] = headline(view, p, G, df);
-    hl1.textContent = h1; hl1.setAttribute("font-size", view === "a" ? 25 : 23);
-    for (let fs = view === "a" ? 25 : 23; fs > 16 && hl1.getComputedTextLength() > vw - 330; fs -= 1) hl1.setAttribute("font-size", fs - 1);
-    hl2.textContent = h2; hlEl.textContent = h1;
-    const spoken = view + ":" + p;
-    if (spoken !== lastSpoken) { live.textContent = h1; lastSpoken = spoken; }
 
     // その時々の飾り（触れない）：段の上のまとまり（a）、きっかけ（a）、戻る先の文字（b）
     lay.dyn.replaceChildren(); lay.top.querySelectorAll(".dyn").forEach((x) => x.remove());
