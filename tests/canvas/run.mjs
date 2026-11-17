@@ -2,7 +2,7 @@
 // 設計書（docs/specs/frontier-canvas.md）の「操作」の試験と、「図の直しの完了」のうち機械で確かめられるものを見る。
 //
 //   node tests/canvas/run.mjs                 # 試験だけ
-//   node tests/canvas/run.mjs --shots <dir>   # 画面も撮る（1440×900 と 1280×800。無い段の b は 1280×800 と 390×844）
+//   node tests/canvas/run.mjs --shots <dir>   # 画面も撮る（1440×900 と 1280×800。無い段の b とそらまめの b は 390×844 も）
 //
 // Chrome の場所は環境変数 CHROME で渡せる。無ければよくある場所を探す。起動した Chrome は、終わりに自分の PID だけを止める。
 import { spawn, execFileSync } from "node:child_process";
@@ -534,6 +534,48 @@ try {
     eq("主な道が答え合わせの表と同じ：" + name, [...new Set(ids.map((i) => nm.get(i)))].sort(), keyPath(spec).sort());
   }
 
+  // ==== 狭い幅の b：見出しを図の外（図の上）に出し、ふつうの大きさで読む。1280 は図の中のまま ====
+  // 見出しの箱（#headline と下の 1 行）の位置・字の大きさ、図の中に縮んだ見出しが残らないこと、横にはみ出さないこと
+  const hlBox = `(() => {
+    const h = document.getElementById("headline"), b = h.getBoundingClientRect(), v = document.getElementById("v").getBoundingClientRect(), t = document.getElementById("top").getBoundingClientRect();
+    const hit = (a, c) => a.left < c.right && c.left < a.right && a.top < c.bottom && c.top < a.bottom;
+    const inSvg = [...document.querySelectorAll("#v text")].filter((x) => __vis(x) && x.textContent === h.textContent).length;
+    return { w: Math.round(b.width), fs: parseFloat(getComputedStyle(h).fontSize), inFig: hit(b, v), onTop: hit(b, t), inSvg, out: document.body.hasAttribute("data-hl-out"), sw: document.documentElement.scrollWidth };
+  })()`;
+  // 本物のマウスで、見出しの真ん中を押す（押したときの動き＝選びを外す、は狭い幅でも 1280 でも同じ）
+  const clickHeadline = async () => {
+    const [x, y] = await js(`(() => { const h = document.body.hasAttribute("data-hl-out") ? document.getElementById("headline") : [...document.querySelectorAll("#v text")].find((x) => x.textContent === document.getElementById("headline").textContent); const r = h.getBoundingClientRect(); return [r.left + Math.min(r.width / 2, 60), r.top + r.height / 2]; })()`);
+    for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+    await js(`new Promise((ok) => setTimeout(() => ok(true), 50))`);
+  };
+  const selNow = () => js(`[...document.querySelectorAll(".card[aria-expanded=true]")].map((g) => g.dataset.nodeId)`);
+  await viewport(390, 844);
+  for (const [name, page, sel] of [["えだまめ", PAGES.planned, "c1"], ["えだまめ（戻しにくさあり）", PAGES.plannedRisk, "c1"], ["そらまめ", PAGES.sora, "n8h"]]) {
+    await open(page + "#b"); await js(HELP);
+    const r = await js(hlBox);
+    check(`390×844 の b：見出しが見える幅で出る（${name}）`, r.w >= 200, JSON.stringify(r));
+    check(`390×844 の b：見出しの字が 14px 以上（${name}）`, r.fs >= 14, JSON.stringify(r));
+    check(`390×844 の b：見出しが図の外にあり、見方の切り替えとも重ならない（${name}）`, !r.inFig && !r.onTop, JSON.stringify(r));
+    eq(`390×844 の b：図の中に縮んだ見出しを残さない（${name}）`, r.inSvg, 0);
+    eq(`390×844 の b：横にはみ出さない（${name}）`, r.sw, 390);
+    check(`390×844 の b：見出しの下の 1 行も図の外に出す（${name}）`, await js(`(() => { const s = document.getElementById("hlSub"); if (!s || !__vis(s)) return false; const b = s.getBoundingClientRect(), v = document.getElementById("v").getBoundingClientRect(); return b.bottom <= v.top + 0.5 && parseFloat(getComputedStyle(s).fontSize) >= 12 && s.textContent.includes("今の段階「今」で判定"); })()`));
+    await go("b&sel=" + sel); eq(`390×844 の b：選んだカード（${name}）`, await selNow(), [sel]);
+    await clickHeadline(); eq(`390×844 の b：見出しを押すと選びが外れる（${name}）`, await selNow(), []);
+    await go("a"); eq(`390×844 の a：見出しは図の中のまま（${name}）`, await js(`document.body.hasAttribute("data-hl-out")`), false);
+  }
+  await viewport(1280, 800);
+  for (const [name, page, sel] of [["えだまめ", PAGES.planned, "c1"], ["そらまめ", PAGES.sora, "n8h"]]) {
+    await open(page + "#b"); await js(HELP);
+    const r = await js(hlBox);
+    check(`1280×800 の b：見出しは図の中のまま（${name}）`, !r.out && r.w <= 1 && r.inSvg === 1, JSON.stringify(r));
+    await js(`document.getElementById("fold").click(); true`);
+    check(`1280×800 の b：一覧をたたんでも図の中のまま（${name}）`, !(await js(`document.body.hasAttribute("data-hl-out")`)));
+    await js(`document.getElementById("fold").click(); true`);
+    await go("b&sel=" + sel); eq(`1280×800 の b：選んだカード（${name}）`, await selNow(), [sel]);
+    await clickHeadline(); eq(`1280×800 の b：見出しを押すと選びが外れる（${name}）`, await selNow(), []);
+  }
+  await viewport(1440, 900);
+
   // ==== version 1・欠けた仕様書・埋め込みなし ====
   await open(PAGES.v1); await js(HELP);
   eq("version 1：主な道（phases が無い図は変わらない）", await js(`[...document.querySelectorAll("[data-layer=main] g[data-edge-id]")].filter(__vis).map((g) => g.dataset.edgeId).sort()`), ["a>b:data", "b>c:data", "c>d:data", "d>e:data"]);
@@ -563,7 +605,7 @@ try {
     // 無い段（架空のえだまめ）：見方 b を 1280 と 390 で
     for (const [w, h] of [[1280, 800], [390, 844]]) {
       await viewport(w, h);
-      for (const [name, page] of [["planned-b", PAGES.planned], ["planned-risk-b", PAGES.plannedRisk]]) {
+      for (const [name, page] of [["planned-b", PAGES.planned], ["planned-risk-b", PAGES.plannedRisk], ...(w === 390 ? [["b", PAGES.sora]] : [])]) {
         await open(page + "#b"); await shot(w + "x" + h + "-" + name);
         if (process.env.DEBUG) console.log(name, w, await js(`[document.documentElement.scrollWidth, innerWidth, document.getElementById("headline").scrollWidth, document.getElementById("headline").clientWidth]`));
       }
