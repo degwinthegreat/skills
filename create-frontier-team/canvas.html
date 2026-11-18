@@ -43,7 +43,7 @@
   .card:focus-visible .focus { display: inline; }
   .empty { padding: 60px 40px; color: #5d5850; font-size: 14px; }
 
-  /* 狭い幅の b：図の倍率で見出しが 14px を下回るときだけ、見出しを図の外（上、全幅）に出し、ふつうの大きさで読む。図と一覧はその下から */
+  /* 狭い幅（a・b・c）：図の倍率で見出しが 14px を下回るときだけ、見出しを図の外（上、全幅）に出し、ふつうの大きさで読む。図と一覧はその下から */
   #hlSub { display: none; }
   body[data-hl-out] #hl { position: fixed; left: 0; right: 0; top: 54px; padding: 0 16px 10px; background: #fbfaf7; border-bottom: 1px solid #e3ded5; z-index: 4; }
   body[data-hl-out] #headline { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; margin: 0; font-size: 16px; font-weight: 600; line-height: 1.5; color: #3d3b38; }
@@ -701,9 +701,10 @@
     hl1.textContent = h1; hl1.setAttribute("font-size", view === "a" ? 25 : 23);
     for (let fs = view === "a" ? 25 : 23; fs > 16 && hl1.getComputedTextLength() > vw - 330; fs -= 1) hl1.setAttribute("font-size", fs - 1);
     hl2.textContent = h2; hlEl.textContent = h1; hlSub.textContent = h2;
-    // 狭い幅の b：縮める前の字（23）でも図の倍率で 14px を下回るなら、見出しを図の外（上）に出す。1280 幅（倍率 0.7 ほど）は図の中のまま
+    // 狭い幅（a・b・c）：縮める前の字（a は 25、b・c は 23）でも図の倍率で 14px を下回るなら、見出しを図の外（上）に出す。1280 幅（倍率 0.7 ほど）は図の中のまま。
+    // 倍率は一覧を出したときの図の幅で測る（たたんでも測り直さない）。たたむ・出すで見出しが図の外と中を行き来しないように（1024×768 など）
     document.body.removeAttribute("data-hl-out");
-    const out = view === "b" && !S.table && (() => { const r = wrap.getBoundingClientRect(); return Math.min(r.width / vw, r.height / H) * 23 < 14; })();
+    const out = !S.table && Math.min((innerWidth - (view === "a" ? 0 : 270)) / vw, innerHeight / H) * (view === "a" ? 25 : 23) < 14;
     document.body.toggleAttribute("data-hl-out", out);
     hl1.style.display = hl2.style.display = out ? "none" : "";
     document.body.style.setProperty("--hl-b", out ? Math.ceil(hlBox.getBoundingClientRect().bottom) + "px" : "");
