@@ -2,7 +2,7 @@
 // 設計書（docs/specs/frontier-canvas.md）の「操作」の試験と、「図の直しの完了」のうち機械で確かめられるものを見る。
 //
 //   node tests/canvas/run.mjs                 # 試験だけ
-//   node tests/canvas/run.mjs --shots <dir>   # 画面も撮る（1440×900 と 1280×800。無い段の b とそらまめの b は 390×844 も）
+//   node tests/canvas/run.mjs --shots <dir>   # 画面も撮る（1440×900 と 1280×800。無い段の a・b・c は 1280×800 と 390×844、そらまめの a・b・c は 390×844 も）
 //
 // Chrome の場所は環境変数 CHROME で渡せる。無ければよくある場所を探す。起動した Chrome は、終わりに自分の PID だけを止める。
 import { spawn, execFileSync } from "node:child_process";
@@ -534,7 +534,7 @@ try {
     eq("主な道が答え合わせの表と同じ：" + name, [...new Set(ids.map((i) => nm.get(i)))].sort(), keyPath(spec).sort());
   }
 
-  // ==== 狭い幅の b：見出しを図の外（図の上）に出し、ふつうの大きさで読む。1280 は図の中のまま ====
+  // ==== 狭い幅（a・b・c）：見出しを図の外（図の上）に出し、ふつうの大きさで読む。1280 は図の中のまま ====
   // 見出しの箱（#headline と下の 1 行）の位置・字の大きさ、図の中に縮んだ見出しが残らないこと、横にはみ出さないこと
   const hlBox = `(() => {
     const h = document.getElementById("headline"), b = h.getBoundingClientRect(), v = document.getElementById("v").getBoundingClientRect(), t = document.getElementById("top").getBoundingClientRect();
@@ -542,6 +542,8 @@ try {
     const inSvg = [...document.querySelectorAll("#v text")].filter((x) => __vis(x) && x.textContent === h.textContent).length;
     return { w: Math.round(b.width), fs: parseFloat(getComputedStyle(h).fontSize), inFig: hit(b, v), onTop: hit(b, t), inSvg, out: document.body.hasAttribute("data-hl-out"), sw: document.documentElement.scrollWidth };
   })()`;
+  // 読める見出し（図の外に出ていれば #headline、図の中なら図の中の字）の場所
+  const hlAt = `(() => { const out = document.body.hasAttribute("data-hl-out"), h = out ? document.getElementById("headline") : [...document.querySelectorAll("#v text")].find((x) => __vis(x) && x.textContent === document.getElementById("headline").textContent); const r = h.getBoundingClientRect(); return { out, x: Math.round(r.left), y: Math.round(r.top) }; })()`;
   // 本物のマウスで、見出しの真ん中を押す（押したときの動き＝選びを外す、は狭い幅でも 1280 でも同じ）
   const clickHeadline = async () => {
     const [x, y] = await js(`(() => { const h = document.body.hasAttribute("data-hl-out") ? document.getElementById("headline") : [...document.querySelectorAll("#v text")].find((x) => x.textContent === document.getElementById("headline").textContent); const r = h.getBoundingClientRect(); return [r.left + Math.min(r.width / 2, 60), r.top + r.height / 2]; })()`);
@@ -549,30 +551,56 @@ try {
     await js(`new Promise((ok) => setTimeout(() => ok(true), 50))`);
   };
   const selNow = () => js(`[...document.querySelectorAll(".card[aria-expanded=true]")].map((g) => g.dataset.nodeId)`);
+  // その見方で見えているカードを 1 枚選ぶ（b は 1 位のカード。a・c は読む順に関係なく見えている最初の 1 枚）
+  const pickSel = async (view, sel) => view === "b" ? sel : js(`[...document.querySelectorAll(".card")].find(__vis).dataset.nodeId`);
+  const SUB = { a: (t) => t.length > 0, b: (t) => t.includes("今の段階「今」で判定"), c: (t) => t.includes("足りないもの") };
   await viewport(390, 844);
-  for (const [name, page, sel] of [["えだまめ", PAGES.planned, "c1"], ["えだまめ（戻しにくさあり）", PAGES.plannedRisk, "c1"], ["そらまめ", PAGES.sora, "n8h"]]) {
-    await open(page + "#b"); await js(HELP);
-    const r = await js(hlBox);
-    check(`390×844 の b：見出しが見える幅で出る（${name}）`, r.w >= 200, JSON.stringify(r));
-    check(`390×844 の b：見出しの字が 14px 以上（${name}）`, r.fs >= 14, JSON.stringify(r));
-    check(`390×844 の b：見出しが図の外にあり、見方の切り替えとも重ならない（${name}）`, !r.inFig && !r.onTop, JSON.stringify(r));
-    eq(`390×844 の b：図の中に縮んだ見出しを残さない（${name}）`, r.inSvg, 0);
-    eq(`390×844 の b：横にはみ出さない（${name}）`, r.sw, 390);
-    check(`390×844 の b：見出しの下の 1 行も図の外に出す（${name}）`, await js(`(() => { const s = document.getElementById("hlSub"); if (!s || !__vis(s)) return false; const b = s.getBoundingClientRect(), v = document.getElementById("v").getBoundingClientRect(); return b.bottom <= v.top + 0.5 && parseFloat(getComputedStyle(s).fontSize) >= 12 && s.textContent.includes("今の段階「今」で判定"); })()`));
-    await go("b&sel=" + sel); eq(`390×844 の b：選んだカード（${name}）`, await selNow(), [sel]);
-    await clickHeadline(); eq(`390×844 の b：見出しを押すと選びが外れる（${name}）`, await selNow(), []);
-    await go("a"); eq(`390×844 の a：見出しは図の中のまま（${name}）`, await js(`document.body.hasAttribute("data-hl-out")`), false);
+  for (const view of ["a", "b", "c"]) {
+    for (const [name, page, sel] of [["えだまめ", PAGES.planned, "c1"], ["えだまめ（戻しにくさあり）", PAGES.plannedRisk, "c1"], ["そらまめ", PAGES.sora, "n8h"]]) {
+      const at = `390×844 の ${view}`;
+      await open(page + "#" + view); await js(HELP);
+      const r = await js(hlBox);
+      check(`${at}：見出しが見える幅で出る（${name}）`, r.w >= 200, JSON.stringify(r));
+      check(`${at}：見出しの字が 14px 以上（${name}）`, r.fs >= 14, JSON.stringify(r));
+      check(`${at}：見出しが図の外にあり、見方の切り替えとも重ならない（${name}）`, !r.inFig && !r.onTop, JSON.stringify(r));
+      eq(`${at}：図の中に縮んだ見出しを残さない（${name}）`, r.inSvg, 0);
+      eq(`${at}：横にはみ出さない（${name}）`, r.sw, 390);
+      const subOk = await js(`(() => { const s = document.getElementById("hlSub"); if (!s || !__vis(s)) return null; const b = s.getBoundingClientRect(), v = document.getElementById("v").getBoundingClientRect(); return b.bottom <= v.top + 0.5 && parseFloat(getComputedStyle(s).fontSize) >= 12 ? s.textContent : null; })()`);
+      check(`${at}：見出しの下の 1 行も図の外に出す（${name}）`, subOk != null && SUB[view](subOk), String(subOk));
+      const id = await pickSel(view, sel);
+      await go(view + "&sel=" + id); eq(`${at}：選んだカード（${name}）`, await selNow(), [id]);
+      await clickHeadline(); eq(`${at}：見出しを押すと選びが外れる（${name}）`, await selNow(), []);
+    }
   }
   await viewport(1280, 800);
-  for (const [name, page, sel] of [["えだまめ", PAGES.planned, "c1"], ["そらまめ", PAGES.sora, "n8h"]]) {
-    await open(page + "#b"); await js(HELP);
-    const r = await js(hlBox);
-    check(`1280×800 の b：見出しは図の中のまま（${name}）`, !r.out && r.w <= 1 && r.inSvg === 1, JSON.stringify(r));
-    await js(`document.getElementById("fold").click(); true`);
-    check(`1280×800 の b：一覧をたたんでも図の中のまま（${name}）`, !(await js(`document.body.hasAttribute("data-hl-out")`)));
-    await js(`document.getElementById("fold").click(); true`);
-    await go("b&sel=" + sel); eq(`1280×800 の b：選んだカード（${name}）`, await selNow(), [sel]);
-    await clickHeadline(); eq(`1280×800 の b：見出しを押すと選びが外れる（${name}）`, await selNow(), []);
+  for (const view of ["a", "b", "c"]) {
+    for (const [name, page, sel] of [["えだまめ", PAGES.planned, "c1"], ["そらまめ", PAGES.sora, "n8h"]]) {
+      const at = `1280×800 の ${view}`;
+      await open(page + "#" + view); await js(HELP);
+      const r = await js(hlBox);
+      check(`${at}：見出しは図の中のまま（${name}）`, !r.out && r.w <= 1 && r.inSvg === 1, JSON.stringify(r));
+      if (view !== "a") {
+        await js(`document.getElementById("fold").click(); true`);
+        check(`${at}：一覧をたたんでも図の中のまま（${name}）`, !(await js(`document.body.hasAttribute("data-hl-out")`)));
+        await js(`document.getElementById("fold").click(); true`);
+      }
+      const id = await pickSel(view, sel);
+      await go(view + "&sel=" + id); eq(`${at}：選んだカード（${name}）`, await selNow(), [id]);
+      await clickHeadline(); eq(`${at}：見出しを押すと選びが外れる（${name}）`, await selNow(), []);
+    }
+  }
+  // 1024×768：一覧をたたむ・出すで、見出しの場所（図の外か中か、どこか）が変わらない
+  await viewport(1024, 768);
+  for (const view of ["b", "c"]) {
+    for (const [name, page] of [["えだまめ", PAGES.planned], ["そらまめ", PAGES.sora]]) {
+      await open(page + "#" + view); await js(HELP);
+      check(`1024×768 の ${view}：一覧をたためる（${name}）`, await js(`document.body.hasAttribute("data-narrow")`));
+      const before = await js(hlAt);
+      await js(`document.getElementById("fold").click(); true`); const folded = await js(hlAt);
+      await js(`document.getElementById("fold").click(); true`); const again = await js(hlAt);
+      eq(`1024×768 の ${view}：一覧をたたんでも見出しの場所が変わらない（${name}）`, folded, before);
+      eq(`1024×768 の ${view}：一覧を出し直しても見出しの場所が変わらない（${name}）`, again, before);
+    }
   }
   await viewport(1440, 900);
 
@@ -602,11 +630,12 @@ try {
       }
       if (w === 1280) { await go("b"); await js(`document.getElementById("fold").click(); true`); await shot(sz + "-b-folded"); }
     }
-    // 無い段（架空のえだまめ）：見方 b を 1280 と 390 で
+    // 無い段（架空のえだまめ）：見方 a・b・c を 1280 と 390 で。そらまめの a・b・c も 390 で
     for (const [w, h] of [[1280, 800], [390, 844]]) {
       await viewport(w, h);
-      for (const [name, page] of [["planned-b", PAGES.planned], ["planned-risk-b", PAGES.plannedRisk], ...(w === 390 ? [["b", PAGES.sora]] : [])]) {
-        await open(page + "#b"); await shot(w + "x" + h + "-" + name);
+      for (const [name, page, view] of [["planned-b", PAGES.planned, "b"], ["planned-risk-b", PAGES.plannedRisk, "b"], ["planned-a", PAGES.planned, "a"], ["planned-c", PAGES.planned, "c"],
+        ...(w === 390 ? [["a", PAGES.sora, "a"], ["b", PAGES.sora, "b"], ["c-tobe", PAGES.sora, "c"]] : [])]) {
+        await open(page + "#" + view); await shot(w + "x" + h + "-" + name);
         if (process.env.DEBUG) console.log(name, w, await js(`[document.documentElement.scrollWidth, innerWidth, document.getElementById("headline").scrollWidth, document.getElementById("headline").clientWidth]`));
       }
     }
